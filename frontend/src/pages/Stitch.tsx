@@ -12,6 +12,8 @@ export function Stitch() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("projectId");
   const project = useProjectStore((s) => s.project);
+  const setProject = useProjectStore((s) => s.setProject);
+  const addToast = useProjectStore((s) => s.addToast);
   const selectedClipId = useProjectStore((s) => s.selectedClipId);
   const setSelectedClip = useProjectStore((s) => s.setSelectedClip);
   const [stitching, setStitching] = useState(false);
@@ -23,18 +25,19 @@ export function Stitch() {
     if (!projectId) return;
     setStitching(true);
     setStitchProgress(0);
-
-    const interval = setInterval(() => {
-      setStitchProgress((prev) => {
-        const next = prev + 5;
-        if (next >= 100) {
-          clearInterval(interval);
-          setStitching(false);
-          return 100;
-        }
-        return next;
-      });
-    }, 300);
+    try {
+      const response = await fetch(`/projects/${encodeURIComponent(projectId)}/render-reel`, { method: "POST" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.detail || "Could not render reel");
+      setProject(payload.project);
+      setStitchProgress(100);
+      addToast({ type: "success", title: "Reel rendered", message: "Your vertical reel is ready in the Export section." });
+      document.getElementById("export")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+      addToast({ type: "error", title: "Render failed", message: error instanceof Error ? error.message : "Could not render reel" });
+    } finally {
+      setStitching(false);
+    }
   };
 
   const totalDuration = clips.reduce((acc: number, c: Clip) => {
@@ -54,7 +57,7 @@ export function Stitch() {
   };
 
   return (
-    <div className="p-8 animate-fade-in-up space-y-6 overflow-y-auto h-full">
+    <div className="p-0 animate-fade-in-up space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -73,25 +76,12 @@ export function Stitch() {
 
       {/* Progress */}
       {stitching && (
-        <div className="space-y-4">
-          <ProcessingStatus processing={{
-            active: true,
-            operation: "Stitching…",
-            progress: stitchProgress,
-            current: Math.floor(stitchProgress / 5),
-            total: clips.length,
-            items: clips.map((c: Clip, i: number) => ({
-              id: c.id,
-              name: c.title,
-              status: i < Math.floor(stitchProgress / 5) ? "completed" : i === Math.floor(stitchProgress / 5) ? "processing" : "waiting",
-              progress: i < Math.floor(stitchProgress / 5) ? 100 : i === Math.floor(stitchProgress / 5) ? stitchProgress % 5 : 0,
-            })),
-          }} />
-          <ProgressBar value={stitchProgress} variant="success" />
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
+          Rendering hook, {clips.length} clips, and subscribe outro into a 9:16 reel…
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Timeline */}
         <div className="col-span-2">
           <Timeline

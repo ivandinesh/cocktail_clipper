@@ -8,6 +8,7 @@ interface ProjectStore {
   error: string | null;
   processing: ProcessingState;
   toasts: ToastMessage[];
+  activityLog: ToastMessage[];
   selectedClipId: string | null;
   selectedSceneIndex: number | null;
   sidebarSection: string;
@@ -23,6 +24,7 @@ interface ProjectStore {
   resetProcessing: () => void;
   addToast: (toast: Omit<ToastMessage, "id">) => void;
   removeToast: (id: string) => void;
+  clearActivityLog: () => void;
   setSelectedClip: (id: string | null) => void;
   setSelectedScene: (index: number | null) => void;
   setSidebarSection: (section: string) => void;
@@ -43,6 +45,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     items: [],
   },
   toasts: [],
+  activityLog: [],
   selectedClipId: null,
   selectedSceneIndex: null,
   sidebarSection: "overview",
@@ -102,14 +105,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }),
 
   addToast: (toast) =>
-    set((state) => ({
-      toasts: [...state.toasts, { ...toast, id: Date.now().toString() }],
-    })),
+    set((state) => {
+      const entry = { ...toast, id: `${Date.now()}-${state.activityLog.length}`, createdAt: Date.now() };
+      return {
+        toasts: [...state.toasts, entry],
+        activityLog: [...state.activityLog, entry].slice(-50),
+      };
+    }),
 
   removeToast: (id) =>
     set((state) => ({
       toasts: state.toasts.filter((t) => t.id !== id),
     })),
+
+  clearActivityLog: () => set({ activityLog: [] }),
 
   setSelectedClip: (id) => set({ selectedClipId: id }),
   setSelectedScene: (index) => set({ selectedSceneIndex: index }),

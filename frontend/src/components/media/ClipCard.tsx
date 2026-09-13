@@ -1,5 +1,5 @@
 import type { Clip } from "../../types";
-import { Play, Check, Clock, Trash2 } from "lucide-react";
+import { Download, Play, Check, Clock, Pencil, Trash2 } from "lucide-react";
 
 interface ClipCardProps {
   clip: Clip;
@@ -8,9 +8,12 @@ interface ClipCardProps {
   onPreview: () => void;
   onInclude: () => void;
   onDelete?: () => void;
+  previewUrl?: string;
+  onEdit?: () => void;
+  downloadUrl?: string;
 }
 
-export function ClipCard({ clip, isSelected, onSelect, onPreview, onInclude, onDelete }: ClipCardProps) {
+export function ClipCard({ clip, isSelected, onSelect, onPreview, onInclude, onDelete, previewUrl, onEdit, downloadUrl }: ClipCardProps) {
   const formatTime = (time: string) => {
     const [h, m, s] = time.split(":").map(Number);
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
@@ -37,11 +40,14 @@ export function ClipCard({ clip, isSelected, onSelect, onPreview, onInclude, onD
     >
       {/* Thumbnail */}
       <div className="aspect-video bg-zinc-900 relative overflow-hidden">
-        <div className="w-full h-full flex items-center justify-center">
-          <div className="w-12 h-12 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100">
-            <Play size={20} className="text-white ml-0.5" />
-          </div>
-        </div>
+        {previewUrl && clip.clip_file ? (
+          <video src={previewUrl} preload="metadata" muted className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-xs text-zinc-500">Preview after cutting</div>
+        )}
+        <button onClick={(event) => { event.stopPropagation(); onPreview(); }} className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/25" aria-label={`Preview ${clip.title}`}>
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white shadow-lg"><Play size={20} className="ml-0.5" /></span>
+        </button>
         <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-sm rounded-full text-[10px] text-white font-mono">
           {duration}
         </div>
@@ -59,6 +65,16 @@ export function ClipCard({ clip, isSelected, onSelect, onPreview, onInclude, onD
         <div className="flex items-center justify-between mb-1">
           <h4 className="text-sm font-semibold text-zinc-900 truncate flex-1">{clip.title}</h4>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {onEdit && (
+              <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="rounded p-1 text-zinc-400 hover:bg-violet-50 hover:text-violet-600" aria-label="Edit clip range">
+                <Pencil size={12} />
+              </button>
+            )}
+            {downloadUrl && clip.final_file && (
+              <a href={downloadUrl} download onClick={(e) => e.stopPropagation()} className="rounded p-1 text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600" aria-label="Download rendered clip">
+                <Download size={12} />
+              </a>
+            )}
             {onDelete && (
               <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 rounded hover:bg-red-50 text-zinc-400 hover:text-red-500">
                 <Trash2 size={12} />

@@ -95,7 +95,7 @@ def cut_clip(
             # Use progress monitoring via stderr parsing
             cmd = (
                 ffmpeg.input(source_video, ss=start_ffmpeg)
-                .output(output_path, ss=start_ffmpeg, to=total_duration, codec="copy")
+                .output(output_path, t=total_duration, codec="copy")
                 .overwrite_output()
             )
 
@@ -132,7 +132,7 @@ def cut_clip(
                 # Run without progress monitoring
                 (
                     ffmpeg.input(source_video, ss=start_time)
-                    .output(output_path, ss=start_time, to=end_time - start_seconds, codec="copy")
+                    .output(output_path, t=total_duration, codec="copy")
                     .overwrite_output()
                     .run(capture_stdout=True, capture_stderr=True)
                 )

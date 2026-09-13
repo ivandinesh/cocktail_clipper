@@ -7,13 +7,16 @@ FastAPI-based backend that handles:
 - Stitch/branding (Phase 3)
 """
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 import uvicorn
 import json
 import os
 import uuid
 import tempfile
+import subprocess
+import re
 import ffmpeg
 from pathlib import Path
 from typing import Optional
@@ -26,6 +29,15 @@ app = FastAPI(
     title="CocktailClips Backend",
     description="Local AI Video Clipper — Backend API",
     version="0.1.0"
+)
+
+# Allow the Vite dev server and local desktop-style clients to call the API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Base directory for all projects
@@ -53,7 +65,7 @@ async def root():
 @app.post("/projects/create")
 async def create_project(
     video: UploadFile = File(...),
-    subtitle: UploadFile = File(...),
+    subtitle: Optional[UploadFile] = File(None),
     project_name: str = Form(...)
 ):
     """Create a new project with uploaded video and subtitle files.
@@ -67,14 +79,14 @@ async def create_project(
         JSON response with project ID and status
     """
     # Validate video file type
-    if not video.filename.endswith(".mp4"):
+    if not video.filename or not video.filename.lower().endswith(".mp4"):
         raise HTTPException(
             status_code=400,
             detail="Video file must be .mp4 format"
         )
 
     # Validate subtitle file type
-    if not subtitle.filename.endswith(".srt"):
+    if subtitle and (not subtitle.filename or not subtitle.filename.lower().endswith(".srt")):
         raise HTTPException(
             status_code=400,
             detail="Subtitle file must be .srt format"
@@ -94,10 +106,11 @@ async def create_project(
         f.write(content)
 
     # Save subtitle file
-    subtitle_path = project_dir / "source.srt"
-    with open(subtitle_path, "wb") as f:
-        content = await subtitle.read()
-        f.write(content)
+    if subtitle:
+        subtitle_path = project_dir / "source.srt"
+        with open(subtitle_path, "wb") as f:
+            content = await subtitle.read()
+            f.write(content)
 
     # Create initial project.json
     project_data = {
@@ -107,7 +120,7 @@ async def create_project(
         },
         "source": {
             "video": "source.mp4",
-            "subtitle": "source.srt"
+            "subtitle": "source.srt" if subtitle else None
         },
         "branding": {
             "channel": "CocktailClips",
@@ -133,82 +146,151 @@ async def create_project(
     )
 
 
+def _normalise_timestamp(value: object) -> str:
+    """Normalize common AI timestamp formats to HH:MM:SS.mmm."""
+    if isinstance(value, (int, float)):
+        total_ms = max(0, int(float(value) * 1000))
+        hours, remainder = divmod(total_ms, 3_600_000)
+        minutes, remainder = divmod(remainder, 60_000)
+        seconds, milliseconds = divmod(remainder, 1_000)
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+    timestamp = str(value or "").strip()
+    parts = timestamp.split(":")
+    if len(parts) == 2:
+        timestamp = f"00:{timestamp}"
+    if len(timestamp.split(".")) == 1:
+        timestamp = f"{timestamp}.000"
+    return timestamp
+
+
+def _normalise_scene_plan(payload: object) -> list[dict]:
+    """Convert common external-AI scene formats into project clip records."""
+    if isinstance(payload, list):
+        raw_clips = payload
+    elif isinstance(payload, dict):
+        raw_clips = payload.get("clips") or payload.get("scenes") or payload.get("segments")
+    else:
+        raw_clips = None
+
+    if not isinstance(raw_clips, list) or not raw_clips:
+        raise HTTPException(status_code=400, detail="Plan must contain a non-empty clips or scenes array")
+
+    clips = []
+    errors = []
+    for index, raw in enumerate(raw_clips, start=1):
+        if not isinstance(raw, dict):
+            errors.append(f"Item {index} must be an object")
+            continue
+
+        start = _normalise_timestamp(raw.get("start") or raw.get("start_time") or raw.get("from"))
+        end = _normalise_timestamp(raw.get("end") or raw.get("end_time") or raw.get("to"))
+        try:
+            start_seconds = parse_timestamp_to_seconds(start)
+            end_seconds = parse_timestamp_to_seconds(end)
+            if start_seconds >= end_seconds:
+                raise ValueError("start must be before end")
+        except (ValueError, TypeError) as exc:
+            errors.append(f"Item {index}: invalid time range ({exc})")
+            continue
+
+        clip_id = str(raw.get("id") or f"{index:03d}")
+        title = str(raw.get("title") or raw.get("summary") or raw.get("description") or f"Clip {index}")
+        clips.append({
+            "id": clip_id,
+            "start": start,
+            "end": end,
+            "title": title,
+            "hook": str(raw.get("hook") or ""),
+            "next_hook": str(raw.get("next_hook") or raw.get("subscribe_text") or "Follow for more"),
+            "transcript": str(raw.get("transcript") or ""),
+            "clip_file": None,
+            "final_file": None,
+            "status": "planned",
+            "include_in_stitch": True,
+        })
+
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors[:8]))
+    return clips
+
+
 @app.post("/projects/import-scenes")
 async def import_scenes(
     project_id: str = Form(...),
     scenes_file: UploadFile = File(...)
 ):
-    """Import AI-generated scenes JSON and merge into project.json.
-
-    Args:
-        project_id: UUID of the project to import scenes into
-        scenes_file: JSON file containing scene definitions
-
-    Returns:
-        JSON response with import status
-    """
+    """Import and normalize a scene plan generated by an external AI tool."""
     project_dir = BASE_DIR / project_id
     if not project_dir.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"Project {project_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
 
-    # Validate JSON file
-    if not scenes_file.filename.endswith(".json"):
-        raise HTTPException(
-            status_code=400,
-            detail="Scenes file must be .json format"
-        )
-
-    # Read and parse scenes JSON
     content = await scenes_file.read()
     try:
         scenes_data = json.loads(content)
     except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid JSON format in scenes file"
-        )
+        raise HTTPException(status_code=400, detail="Invalid JSON format in scene plan")
 
-    # Read existing project.json
     project_json_path = project_dir / "project.json"
     if not project_json_path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="project.json not found in project directory"
-        )
+        raise HTTPException(status_code=404, detail="project.json not found in project directory")
 
+    new_clips = _normalise_scene_plan(scenes_data)
     with open(project_json_path, "r") as f:
         project_data = json.load(f)
 
-    # Merge scenes into project.clips
-    new_clips = scenes_data.get("clips", [])
-    existing_clips = project_data.get("clips", [])
+    # Re-importing a plan replaces the previous planned set instead of duplicating it.
+    project_data["clips"] = new_clips
+    project_data["scenes"] = [
+        {
+            "id": clip["id"],
+            "index": index,
+            "start": clip["start"],
+            "end": clip["end"],
+            "title": clip["title"],
+            "summary": clip["title"],
+            "tags": [],
+            "selected": False,
+        }
+        for index, clip in enumerate(new_clips)
+    ]
 
-    # Avoid duplicate IDs - ensure required fields exist
-    for clip in new_clips:
-        if "id" not in clip:
-            clip["id"] = f"imported_{len(existing_clips) + 1}"
-        # Ensure required fields exist
-        clip.setdefault("status", "planned")
-        clip.setdefault("clip_file", None)
-        clip.setdefault("final_file", None)
-        clip.setdefault("transcript", "")
-
-    project_data["clips"] = existing_clips + new_clips
-
-    # Write updated project.json
     with open(project_json_path, "w") as f:
         json.dump(project_data, f, indent=2)
 
-    return JSONResponse(
-        content={
-            "status": "success",
-            "message": "Scenes imported successfully",
-            "total_clips": len(project_data["clips"])
-        }
-    )
+    return JSONResponse(content={
+        "status": "success",
+        "message": "Scene plan imported successfully",
+        "total_clips": len(new_clips),
+        "project": project_data,
+    })
+
+
+@app.get("/projects")
+async def list_projects():
+    """List locally stored projects for the workspace project rail."""
+    projects = []
+    for project_dir in BASE_DIR.iterdir():
+        if not project_dir.is_dir():
+            continue
+        project_json_path = project_dir / "project.json"
+        if not project_json_path.exists():
+            continue
+        try:
+            with open(project_json_path, "r") as f:
+                data = json.load(f)
+            clips = data.get("clips", [])
+            projects.append({
+                "id": data.get("project", {}).get("id", project_dir.name),
+                "name": data.get("project", {}).get("name", project_dir.name),
+                "clips": len(clips),
+                "completed": sum(1 for clip in clips if clip.get("status") == "completed"),
+                "updated_at": project_json_path.stat().st_mtime,
+            })
+        except (OSError, json.JSONDecodeError):
+            continue
+    projects.sort(key=lambda project: project["updated_at"], reverse=True)
+    return JSONResponse(content={"projects": projects})
 
 
 @app.get("/projects/{project_id}")
@@ -375,6 +457,331 @@ async def cut_project_clip(
             "title": new_clip["title"]
         }
     )
+
+
+@app.post("/projects/{project_id}/cut-all")
+async def cut_all_project_clips(project_id: str):
+    """Cut every planned clip in the imported AI scene plan."""
+    project_dir = BASE_DIR / project_id
+    project_json_path = project_dir / "project.json"
+    source_path = project_dir / "source.mp4"
+
+    if not project_dir.exists() or not project_json_path.exists():
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    if not source_path.exists():
+        raise HTTPException(status_code=400, detail="Source video is missing from the project")
+
+    with open(project_json_path, "r") as f:
+        project_data = json.load(f)
+
+    clips = project_data.get("clips", [])
+    if not clips:
+        raise HTTPException(status_code=400, detail="Import an AI scene plan before cutting clips")
+
+    clips_dir = project_dir / "clips"
+    clips_dir.mkdir(parents=True, exist_ok=True)
+    srt_path = project_dir / "source.srt"
+    completed = 0
+    failed = 0
+    results = []
+
+    for index, clip in enumerate(clips, start=1):
+        if clip.get("status") == "cut" and clip.get("clip_file") and (clips_dir / clip["clip_file"]).exists():
+            completed += 1
+            results.append({"id": clip.get("id"), "status": "cut", "clip_file": clip.get("clip_file")})
+            continue
+
+        clip["status"] = "processing"
+        clip["error"] = None
+        output_name = f"{index:03d}.mp4"
+        output_path = clips_dir / output_name
+        try:
+            start = clip.get("start", "")
+            end = clip.get("end", "")
+            if not validate_timestamp_format(start) or not validate_timestamp_format(end):
+                raise ValueError("timestamps must use HH:MM:SS.mmm format")
+            if parse_timestamp_to_seconds(start) >= parse_timestamp_to_seconds(end):
+                raise ValueError("start must be before end")
+
+            result = cut_clip(
+                source_video=str(source_path),
+                start_time=start,
+                end_time=end,
+                output_path=str(output_path),
+            )
+            if result is None or not output_path.exists():
+                raise RuntimeError("FFmpeg did not create the clip file")
+
+            if srt_path.exists():
+                try:
+                    subtitle_file = extract_subtitles_srt(str(srt_path), start, end)
+                    if subtitle_file and getattr(subtitle_file, "events", None):
+                        clip["transcript"] = "\n".join(event.text for event in subtitle_file.events)
+                        shifted = shift_subtitle_timestamps(subtitle_file, parse_timestamp_to_seconds(start))
+                        ass_path = clips_dir / f"{output_name}.ass"
+                        if generate_ass_file(shifted, str(ass_path)):
+                            burn_subtitles_ffmpeg(str(output_path), str(ass_path), str(output_path))
+                except Exception as subtitle_error:
+                    # Cutting remains successful if optional subtitle processing fails.
+                    clip["subtitle_error"] = str(subtitle_error)
+
+            clip["clip_file"] = output_name
+            clip["status"] = "cut"
+            clip["error"] = None
+            completed += 1
+            results.append({"id": clip.get("id"), "status": "cut", "clip_file": output_name})
+        except Exception as error:
+            clip["status"] = "failed"
+            clip["error"] = str(error)
+            failed += 1
+            results.append({"id": clip.get("id"), "status": "failed", "error": str(error)})
+
+        with open(project_json_path, "w") as f:
+            json.dump(project_data, f, indent=2)
+
+    return JSONResponse(content={
+        "status": "success" if failed == 0 else "partial", 
+        "message": "Clip cutting completed" if failed == 0 else "Some clips could not be cut",
+        "total": len(clips),
+        "completed": completed,
+        "failed": failed,
+        "results": results,
+        "project": project_data,
+    }, status_code=500 if completed == 0 else 200)
+
+
+def _drawtext_value(value: str) -> str:
+    return str(value or "").replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'").replace("%", "\\%")
+
+
+def _find_fontfile() -> Optional[str]:
+    """Find an explicit font so drawtext does not depend on Fontconfig."""
+    candidates = [
+        Path("C:/Windows/Fonts/arial.ttf"),
+        Path("C:/Windows/Fonts/segoeui.ttf"),
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
+        Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+    ]
+    return next((str(path) for path in candidates if path.exists()), None)
+
+
+def _drawtext_font_option() -> str:
+    fontfile = _find_fontfile()
+    return f"fontfile='{_drawtext_value(fontfile)}':" if fontfile else ""
+
+
+def _run_ffmpeg(args: list[str]) -> None:
+    completed = subprocess.run(["ffmpeg", "-y", *args], capture_output=True, text=True)
+    if completed.returncode != 0:
+        detail = completed.stderr[-1200:] if completed.stderr else "FFmpeg failed"
+        raise RuntimeError(detail)
+
+
+def _render_individual_clip(project_dir: Path, clip: dict, branding: dict, output_path: Path) -> None:
+    """Render one hook + normalized clip + subscribe outro file."""
+    clip_id = re.sub(r"[^A-Za-z0-9_-]", "_", str(clip.get("id", "clip")))
+    work_dir = project_dir / "rendered" / "individual" / clip_id
+    work_dir.mkdir(parents=True, exist_ok=True)
+    source_clip = project_dir / "clips" / clip["clip_file"]
+    hook_duration = float(branding.get("hook_duration", 1.5))
+    outro_duration = float(branding.get("outro_duration", 2))
+    subscribe_text = branding.get("outro_text", "Follow for more")
+
+    first_frame = work_dir / "first-frame.png"
+    _run_ffmpeg(["-i", str(source_clip), "-vf", "select=eq(n\\,0)", "-frames:v", "1", str(first_frame)])
+    hook_path = work_dir / "hook.mp4"
+    hook_text = _drawtext_value(clip.get("hook") or clip.get("title") or "The moment everyone is talking about")
+    hook_filter = f"scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,drawtext={_drawtext_font_option()}text='{hook_text}':fontcolor=white:fontsize=64:borderw=4:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2"
+    _run_ffmpeg(["-loop", "1", "-i", str(first_frame), "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", str(hook_duration), "-vf", hook_filter, "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(hook_path)])
+
+    normalized_path = work_dir / "clip.mp4"
+    normalize_filter = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
+    _run_ffmpeg(["-i", str(source_clip), "-vf", normalize_filter, "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", str(normalized_path)])
+
+    outro_path = work_dir / "outro.mp4"
+    outro_text = _drawtext_value(subscribe_text)
+    outro_filter = f"drawtext={_drawtext_font_option()}text='{outro_text}':fontcolor=white:fontsize=64:borderw=4:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2"
+    _run_ffmpeg(["-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=30", "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", str(outro_duration), "-vf", outro_filter, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(outro_path)])
+
+    concat_list = work_dir / "segments.txt"
+    entries = [hook_path, normalized_path, outro_path]
+    concat_list.write_text("\n".join(f"file '{str(path.resolve()).replace(chr(92), '/').replace(chr(39), chr(39) + chr(92) + chr(39))}'" for path in entries), encoding="utf-8")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _run_ffmpeg(["-f", "concat", "-safe", "0", "-i", str(concat_list), "-c", "copy", "-movflags", "+faststart", str(output_path)])
+    if not output_path.exists() or output_path.stat().st_size == 0:
+        raise RuntimeError("FFmpeg did not create the individual rendered clip")
+
+
+@app.post("/projects/{project_id}/branding")
+async def update_branding(
+    project_id: str,
+    channel: Optional[str] = Form(default=None),
+    hook_duration: Optional[float] = Form(default=None),
+    outro_duration: Optional[float] = Form(default=None),
+    outro_text: Optional[str] = Form(default=None),
+):
+    """Update persisted branding values used by the reel renderer."""
+    project_dir = BASE_DIR / project_id
+    project_json_path = project_dir / "project.json"
+    if not project_dir.exists() or not project_json_path.exists():
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+
+    with open(project_json_path, "r") as f:
+        project_data = json.load(f)
+    branding = project_data.setdefault("branding", {})
+    if channel is not None:
+        branding["channel"] = channel.strip() or "CocktailClips"
+    if hook_duration is not None:
+        if not 0.5 <= hook_duration <= 10:
+            raise HTTPException(status_code=400, detail="Hook duration must be between 0.5 and 10 seconds")
+        branding["hook_duration"] = hook_duration
+    if outro_duration is not None:
+        if not 0.5 <= outro_duration <= 10:
+            raise HTTPException(status_code=400, detail="Outro duration must be between 0.5 and 10 seconds")
+        branding["outro_duration"] = outro_duration
+    if outro_text is not None:
+        branding["outro_text"] = outro_text.strip() or "Follow for more"
+
+    project_data["output"] = {"file": None, "status": "not_started"}
+    with open(project_json_path, "w") as f:
+        json.dump(project_data, f, indent=2)
+    return JSONResponse(content={"status": "success", "project": project_data})
+
+
+@app.post("/projects/{project_id}/render-reel")
+async def render_reel(project_id: str):
+    """Render one vertical hook + clips + subscribe reel from cut clips."""
+    project_dir = BASE_DIR / project_id
+    project_json_path = project_dir / "project.json"
+    if not project_dir.exists() or not project_json_path.exists():
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+
+    with open(project_json_path, "r") as f:
+        project_data = json.load(f)
+
+    clips = [clip for clip in project_data.get("clips", []) if clip.get("include_in_stitch", True)]
+    if not clips:
+        raise HTTPException(status_code=400, detail="No clips are included in the reel")
+    missing = [clip.get("id", "unknown") for clip in clips if clip.get("status") != "cut" or not clip.get("clip_file") or not (project_dir / "clips" / clip["clip_file"]).exists()]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Cut these clips before rendering: {', '.join(missing)}")
+
+    branding = project_data.get("branding", {})
+    hook_duration = float(branding.get("hook_duration", 1.5))
+    outro_duration = float(branding.get("outro_duration", 2))
+    subscribe_text = branding.get("outro_text", "Follow for more")
+    render_dir = project_dir / "rendered"
+    final_dir = project_dir / "final"
+    render_dir.mkdir(parents=True, exist_ok=True)
+    final_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        first_clip_path = project_dir / "clips" / clips[0]["clip_file"]
+        first_frame = render_dir / "hook-frame.png"
+        _run_ffmpeg(["-i", str(first_clip_path), "-vf", "select=eq(n\\,0)", "-frames:v", "1", str(first_frame)])
+
+        hook_path = render_dir / "hook.mp4"
+        hook_text = _drawtext_value(clips[0].get("hook") or clips[0].get("title") or "The moment everyone is talking about")
+        hook_filter = f"scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,drawtext={_drawtext_font_option()}text='{hook_text}':fontcolor=white:fontsize=64:borderw=4:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2"
+        _run_ffmpeg(["-loop", "1", "-i", str(first_frame), "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", str(hook_duration), "-vf", hook_filter, "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(hook_path)])
+
+        segment_paths = [hook_path]
+        for index, clip in enumerate(clips, start=1):
+            input_path = project_dir / "clips" / clip["clip_file"]
+            segment_path = render_dir / f"clip-{index:03d}.mp4"
+            normalize_filter = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
+            _run_ffmpeg(["-i", str(input_path), "-vf", normalize_filter, "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", str(segment_path)])
+            segment_paths.append(segment_path)
+
+        outro_path = render_dir / "outro.mp4"
+        outro_text = _drawtext_value(subscribe_text)
+        outro_filter = f"drawtext={_drawtext_font_option()}text='{outro_text}':fontcolor=white:fontsize=64:borderw=4:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2"
+        _run_ffmpeg(["-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=30", "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", str(outro_duration), "-vf", outro_filter, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(outro_path)])
+        segment_paths.append(outro_path)
+
+        concat_list = render_dir / "segments.txt"
+        concat_entries = []
+        for path in segment_paths:
+            absolute_path = str(path.resolve()).replace("\\", "/").replace("'", "'\\''")
+            concat_entries.append(f"file '{absolute_path}'")
+        concat_list.write_text("\n".join(concat_entries), encoding="utf-8")
+        output_path = final_dir / "reel.mp4"
+        _run_ffmpeg(["-f", "concat", "-safe", "0", "-i", str(concat_list), "-c", "copy", "-movflags", "+faststart", str(output_path)])
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Reel rendering failed: {error}") from error
+
+    if not output_path.exists() or output_path.stat().st_size == 0:
+        raise HTTPException(status_code=500, detail="FFmpeg completed without creating a valid reel file")
+
+    project_data["output"] = {"file": "final/reel.mp4", "status": "completed", "width": 1080, "height": 1920, "size_bytes": output_path.stat().st_size}
+    for clip in clips:
+        clip["final_file"] = "final/reel.mp4"
+        clip["status"] = "completed"
+    with open(project_json_path, "w") as f:
+        json.dump(project_data, f, indent=2)
+
+    return JSONResponse(content={"status": "success", "message": "Reel rendered successfully", "output": project_data["output"], "project": project_data})
+
+
+@app.post("/projects/{project_id}/render-clips")
+async def render_selected_clips(project_id: str, clip_ids: list[str] = Body(..., embed=True)):
+    """Render selected cut clips as separate branded vertical MP4 files."""
+    project_dir = BASE_DIR / project_id
+    project_json_path = project_dir / "project.json"
+    if not project_dir.exists() or not project_json_path.exists():
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    if not clip_ids:
+        raise HTTPException(status_code=400, detail="Select at least one clip to render")
+
+    with open(project_json_path, "r") as f:
+        project_data = json.load(f)
+    clips_by_id = {str(clip.get("id")): clip for clip in project_data.get("clips", [])}
+    selected = [clips_by_id[clip_id] for clip_id in clip_ids if clip_id in clips_by_id]
+    missing_ids = [clip_id for clip_id in clip_ids if clip_id not in clips_by_id]
+    if missing_ids:
+        raise HTTPException(status_code=404, detail=f"Clips not found: {', '.join(missing_ids)}")
+    uncut = [clip.get("id", "unknown") for clip in selected if clip.get("status") != "cut" or not clip.get("clip_file") or not (project_dir / "clips" / clip["clip_file"]).exists()]
+    if uncut:
+        raise HTTPException(status_code=400, detail=f"Cut these clips before rendering: {', '.join(uncut)}")
+
+    branding = project_data.get("branding", {})
+    rendered = []
+    errors = []
+    for clip in selected:
+        safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", str(clip["id"]))
+        output_name = f"{safe_id}.mp4"
+        output_path = project_dir / "final" / "clips" / output_name
+        try:
+            _render_individual_clip(project_dir, clip, branding, output_path)
+            clip["final_file"] = f"final/clips/{output_name}"
+            clip["individual_render_status"] = "completed"
+            rendered.append({"id": clip["id"], "file": clip["final_file"], "size_bytes": output_path.stat().st_size})
+        except Exception as error:
+            clip["individual_render_status"] = "failed"
+            clip["render_error"] = str(error)
+            errors.append({"id": clip["id"], "error": str(error)})
+
+    with open(project_json_path, "w") as f:
+        json.dump(project_data, f, indent=2)
+    return JSONResponse(content={"status": "success" if rendered and not errors else "partial" if rendered else "failed", "rendered": rendered, "errors": errors, "project": project_data}, status_code=200 if rendered else 500)
+
+
+@app.get("/projects/{project_id}/clips/{clip_id}/download")
+async def download_rendered_clip(project_id: str, clip_id: str):
+    project_dir = BASE_DIR / project_id
+    project_json_path = project_dir / "project.json"
+    if not project_json_path.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    with open(project_json_path, "r") as f:
+        project_data = json.load(f)
+    clip = next((item for item in project_data.get("clips", []) if str(item.get("id")) == clip_id), None)
+    if not clip or not clip.get("final_file") or not str(clip["final_file"]).startswith("final/clips/"):
+        raise HTTPException(status_code=404, detail="Individual rendered clip not found")
+    output_path = project_dir / clip["final_file"]
+    if not output_path.exists():
+        raise HTTPException(status_code=404, detail="Individual rendered clip file not found")
+    return FileResponse(str(output_path), media_type="video/mp4", filename=output_path.name)
 
 
 @app.post("/projects/{project_id}/stitch")
@@ -783,8 +1190,8 @@ async def restitch_clip(
 
         result = stitch_video(
             clips=[clip_path],
-            intro_path=intro_output,
-            outro_path=outro_output,
+            intro_path=str(intro_output),
+            outro_path=str(outro_output),
             output_path=output_path,
             logo_path=logo_path,
             logo_size="150x150"
@@ -815,6 +1222,15 @@ async def restitch_clip(
         "final_file": final_file_name,
         "clip_id": clip_id
     })
+
+
+@app.get("/projects/{project_id}/source")
+async def preview_source(project_id: str):
+    """Stream the project's original source video."""
+    source_path = BASE_DIR / project_id / "source.mp4"
+    if not source_path.exists():
+        raise HTTPException(status_code=404, detail="Source video not found")
+    return FileResponse(str(source_path), media_type="video/mp4", filename="source.mp4")
 
 
 @app.get("/projects/{project_id}/clips/{clip_id}/preview")
@@ -883,17 +1299,16 @@ async def download_final_video(
     with open(project_dir / "project.json", "r") as f:
         project_data = json.load(f)
 
-    # Find the first completed clip's final file
-    final_file = None
-    for clip in project_data["clips"]:
-        if clip.get("final_file"):
-            final_file = clip["final_file"]
-            break
+    output_file = project_data.get("output", {}).get("file")
+    if output_file:
+        video_path = project_dir / output_file
+        final_file = video_path.name
+    else:
+        final_file = next((clip.get("final_file") for clip in project_data["clips"] if clip.get("final_file")), None)
+        if not final_file:
+            raise HTTPException(status_code=404, detail="No final video available")
+        video_path = project_dir / "final" / final_file
 
-    if not final_file:
-        raise HTTPException(status_code=404, detail="No final video available")
-
-    video_path = project_dir / "final" / final_file
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="Final video file not found")
 
@@ -909,5 +1324,5 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=8000,
-        description="Start the CocktailClips Backend server"
+
     )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
 import type { Project } from "../types";
 import { VideoPreview } from "../components/media/VideoPreview";
@@ -9,7 +9,7 @@ import { ProgressBar } from "../components/ui";
 
 export function ProjectHome() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+
   const projectId = searchParams.get("projectId");
   const project = useProjectStore((s) => s.project);
   const setProject = useProjectStore((s) => s.setProject);
@@ -17,11 +17,12 @@ export function ProjectHome() {
   const loading = useProjectStore((s) => s.loading);
   const setLoading = useProjectStore((s) => s.setLoading);
   const [status, setStatus] = useState("Ready");
+  const apiBaseUrl = import.meta.env.VITE_API_URL || "";
 
   useEffect(() => {
     if (!projectId) return;
     setLoading(true);
-    fetch(`http://localhost:8000/projects/${projectId}`)
+    fetch(`${apiBaseUrl}/projects/${projectId}`)
       .then((res) => res.json())
       .then((data: Project) => {
         setProject(data);
@@ -47,7 +48,7 @@ export function ProjectHome() {
 
   if (!project) {
     return (
-      <EmptyState title="No project selected" description="Create a new project or select an existing one to get started." action={{ label: "Create Project", onClick: () => navigate("/") }} />
+      <EmptyState title="No project selected" description="Create a new project or select an existing one to get started." action={{ label: "Back to project", onClick: () => document.getElementById("source")?.scrollIntoView({ behavior: "smooth" }) }} />
     );
   }
 
@@ -66,7 +67,7 @@ export function ProjectHome() {
   ];
 
   return (
-    <div className="p-8 animate-fade-in-up space-y-8 overflow-y-auto h-full">
+    <div className="p-0 animate-fade-in-up space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -84,15 +85,15 @@ export function ProjectHome() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Left: Video Preview + Info */}
         <div className="col-span-2 space-y-6">
           {/* Video Preview */}
           <div className="card p-6">
             <h2 className="text-lg font-semibold text-zinc-900 mb-4">Source Video</h2>
             <VideoPreview
-              src={`/projects/${projectId}/source.mp4`}
-              duration="00:00:00"
+              src={`/projects/${projectId}/source`}
+              duration="Loading…"
             />
             <div className="flex items-center justify-between mt-4 text-sm text-zinc-500">
               <span>{project.source.video}</span>
@@ -119,8 +120,8 @@ export function ProjectHome() {
                 <p className="text-sm font-medium text-zinc-900 mt-0.5">{value}</p>
               </div>
             ))}
+            </div>
           </div>
-        </div>
         </div>
 
         {/* Right: Workflow */}
@@ -174,10 +175,8 @@ export function ProjectHome() {
               size="sm"
               className="w-full"
               onClick={() => {
-                if (total === 0) navigate("/scenes");
-                else if (cut === 0) navigate("/scenes");
-                else if (completed < total) navigate("/clips");
-                else navigate("/stitch");
+                const target = total === 0 || cut === 0 ? "scenes" : completed < total ? "clips" : "stitch";
+                document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
             >
               {total === 0 ? "Add Scenes" :

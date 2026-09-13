@@ -8,11 +8,11 @@ interface BadgeProps {
 
 export function Badge({ variant = "default", children, className = "" }: BadgeProps) {
   const variants = {
-    default: "bg-zinc-100 text-zinc-700 border-zinc-200",
-    success: "bg-green-50 text-green-700 border-green-200",
+    default: "bg-slate-100 text-slate-700 border-slate-200",
+    success: "bg-emerald-50 text-emerald-700 border-emerald-200",
     warning: "bg-amber-50 text-amber-700 border-amber-200",
-    error: "bg-red-50 text-red-700 border-red-200",
-    info: "bg-blue-50 text-blue-700 border-blue-200",
+    error: "bg-rose-50 text-rose-700 border-rose-200",
+    info: "bg-indigo-50 text-indigo-700 border-indigo-200",
   };
 
   return (
@@ -38,15 +38,15 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const base = "inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+  const base = "inline-flex items-center justify-center font-semibold rounded-2xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]";
 
   const variants = {
-    primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30",
-    secondary: "bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 shadow-sm",
-    ghost: "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100",
-    danger: "bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-600/20",
-    green: "bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-600/20",
-    orange: "bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-500/20",
+    primary: "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white hover:brightness-110 shadow-lg shadow-indigo-500/20",
+    secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm",
+    ghost: "text-slate-500 hover:text-slate-900 hover:bg-slate-100",
+    danger: "bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20",
+    green: "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:brightness-110 shadow-lg shadow-emerald-500/20",
+    orange: "bg-gradient-to-r from-orange-400 to-pink-500 text-white hover:brightness-110 shadow-lg shadow-orange-500/20",
   };
 
   const sizes = {
@@ -76,7 +76,7 @@ interface CardProps {
 export function Card({ children, className = "", hover = false, onClick }: CardProps) {
   return (
     <div
-      className={`bg-white rounded-2xl border border-zinc-200 shadow-sm ${hover ? "hover:shadow-md hover:border-zinc-300 transition-all duration-200 cursor-pointer" : ""} ${className}`}
+      className={`bg-white rounded-3xl border border-slate-200/80 shadow-sm ${hover ? "hover:shadow-xl hover:-translate-y-0.5 hover:border-indigo-200 transition-all duration-200 cursor-pointer" : ""} ${className}`}
       onClick={onClick}
     >
       {children}

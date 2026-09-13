@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
 import type { Scene } from "../types";
 import { SceneCard } from "../components/media/SceneCard";
+import { VideoPreview } from "../components/media/VideoPreview";
 import { Button } from "../components/ui";
 import { EmptyState } from "../components/ui/EmptyState";
 import { DropZone } from "../components/ui/DropZone";
@@ -23,6 +24,11 @@ export function Scenes() {
   const [analyzeProgress, setAnalyzeProgress] = useState(0);
 
   const scenes: Scene[] = project?.scenes || [];
+  const selectedScene = selectedSceneIndex !== null ? scenes[selectedSceneIndex] : null;
+  const toSeconds = (time: string) => {
+    const [hours, minutes, seconds] = time.split(":").map(Number);
+    return hours * 3600 + minutes * 60 + seconds;
+  };
 
   const handleAnalyze = async () => {
     if (!projectId) return;
@@ -62,12 +68,9 @@ export function Scenes() {
     setSelectedScene(selectedSceneIndex === index ? null : index);
   };
 
-  const handlePreview = (_scene: Scene) => {
-    // Preview scene
-  };
 
   return (
-    <div className="p-8 animate-fade-in-up space-y-6 overflow-y-auto h-full">
+    <div className="p-0 animate-fade-in-up space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -93,11 +96,31 @@ export function Scenes() {
               List
             </button>
           </div>
-          <Button onClick={handleAnalyze} disabled={analyzing} variant="primary" size="sm">
-            {analyzing ? "Analyzing…" : "Analyze Video"}
-          </Button>
+          <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">Import plan above</span>
         </div>
       </div>
+
+      {selectedScene && projectId && (
+        <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_260px]">
+          <VideoPreview
+            src={`/projects/${encodeURIComponent(projectId)}/source`}
+            startTime={toSeconds(selectedScene.start)}
+            endTime={toSeconds(selectedScene.end)}
+            duration="Loading…"
+          />
+          <div className="flex flex-col justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-violet-600">Selected moment</p>
+              <h3 className="mt-2 text-lg font-bold text-slate-900">{selectedScene.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{selectedScene.summary}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+              <div className="flex justify-between"><span>In</span><strong className="font-mono">{selectedScene.start}</strong></div>
+              <div className="mt-2 flex justify-between"><span>Out</span><strong className="font-mono">{selectedScene.end}</strong></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Processing Status */}
       {analyzing && (
@@ -124,18 +147,18 @@ export function Scenes() {
       {scenes.length === 0 && !analyzing ? (
         <EmptyState
           title="No scenes yet"
-          description="Analyze your video or transcript to detect scenes. Each scene will be shown as a visual card."
-          action={{ label: "Analyze Video", onClick: handleAnalyze }}
+          description="Import an AI-generated scene plan above to review timestamps and titles before cutting clips."
+          action={undefined}
         />
       ) : (
-        <div className={viewMode === "grid" ? "grid grid-cols-3 gap-4" : "space-y-3"}>
+        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5" : "space-y-3"}>
           {scenes.map((scene: Scene, i: number) => (
             <SceneCard
               key={scene.id}
               scene={scene}
               isSelected={selectedSceneIndex === i}
               onSelect={() => handleSelectScene(i)}
-              onPreview={() => handlePreview(scene)}
+              onPreview={() => handleSelectScene(i)}
               viewMode={viewMode}
             />
           ))}

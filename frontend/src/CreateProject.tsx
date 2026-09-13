@@ -15,8 +15,8 @@ export default function CreateProject() {
     setError("");
     setLoading(true);
 
-    if (!videoFile || !srtFile) {
-      setError("Please upload both MP4 and SRT files");
+    if (!videoFile) {
+      setError("Please upload an MP4 video file");
       setLoading(false);
       return;
     }
@@ -24,10 +24,10 @@ export default function CreateProject() {
     try {
       const formData = new FormData();
       formData.append("video", videoFile);
-      formData.append("subtitle", srtFile);
+      if (srtFile) formData.append("subtitle", srtFile);
       formData.append("project_name", projectName);
 
-      const res = await fetch("http://localhost:8000/projects/create", {
+      const res = await fetch("/projects/create", {
         method: "POST",
         body: formData,
       });

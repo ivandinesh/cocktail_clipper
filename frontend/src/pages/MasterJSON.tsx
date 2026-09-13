@@ -23,7 +23,7 @@ export function MasterJSON() {
   };
 
   return (
-    <div className="p-8 animate-fade-in-up space-y-6 overflow-y-auto h-full">
+    <div className="p-0 animate-fade-in-up space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

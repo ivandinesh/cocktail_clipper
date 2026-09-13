@@ -11,10 +11,17 @@ export interface Project {
     channel: string;
     intro_duration: number;
     outro_duration: number;
+    hook_duration?: number;
     outro_text: string;
   };
   clips: Clip[];
   scenes?: Scene[];
+  output?: {
+    file: string;
+    status: "not_started" | "rendering" | "completed" | "failed";
+    width?: number;
+    height?: number;
+  };
 }
 
 export interface Clip {
@@ -27,7 +34,7 @@ export interface Clip {
   transcript: string;
   clip_file: string | null;
   final_file: string | null;
-  status: "planned" | "cut" | "completed";
+  status: "planned" | "processing" | "cut" | "completed" | "failed";
   scene_index?: number;
   include_in_stitch?: boolean;
 }
@@ -66,6 +73,7 @@ export interface ToastMessage {
   type: "success" | "error" | "info" | "warning";
   title: string;
   message?: string;
+  createdAt?: number;
 }
 
 export type ViewMode = "visual" | "json";

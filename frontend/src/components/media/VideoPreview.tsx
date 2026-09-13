@@ -8,13 +8,29 @@ interface VideoPreviewProps {
   onPlayPause?: () => void;
   onSeek?: (time: number) => void;
   isPlaying?: boolean;
+  startTime?: number;
+  endTime?: number;
   className?: string;
 }
 
-export function VideoPreview({ src, duration, currentTime = "00:00:00", onPlayPause, onSeek, isPlaying, className = "" }: VideoPreviewProps) {
+export function VideoPreview({ src, duration, currentTime = "00:00:00", onPlayPause, onSeek, isPlaying, startTime, endTime, className = "" }: VideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [isLocalPlaying, setIsLocalPlaying] = useState(false);
+  const [actualCurrentTime, setActualCurrentTime] = useState(0);
+  const [actualDuration, setActualDuration] = useState<number | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const handleMute = () => {
+    if (!videoRef.current) return;
+    videoRef.current.muted = !videoRef.current.muted;
+    setIsMuted(videoRef.current.muted);
+  };
+
+  const handleFullscreen = () => {
+    if (frameRef.current?.requestFullscreen) void frameRef.current.requestFullscreen();
+  };
 
   const handlePlayPause = useCallback(() => {
     if (videoRef.current) {
@@ -40,11 +56,38 @@ export function VideoPreview({ src, duration, currentTime = "00:00:00", onPlayPa
   }, [onSeek]);
 
   const handleTimeUpdate = useCallback(() => {
-    if (videoRef.current) {
-      const pct = (videoRef.current.currentTime / videoRef.current.duration) * 100;
-      setProgress(pct);
+    if (videoRef.current && Number.isFinite(videoRef.current.duration)) {
+      if (endTime !== undefined && videoRef.current.currentTime >= endTime) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = startTime ?? 0;
+        setIsLocalPlaying(false);
+      }
+      setActualCurrentTime(videoRef.current.currentTime);
+      setProgress((videoRef.current.currentTime / videoRef.current.duration) * 100);
     }
-  }, []);
+  }, [endTime, startTime]);
+
+  const handleLoadedMetadata = useCallback(() => {
+    if (videoRef.current && Number.isFinite(videoRef.current.duration)) {
+      setActualDuration(videoRef.current.duration);
+      if (startTime !== undefined) {
+        videoRef.current.currentTime = startTime;
+        setActualCurrentTime(startTime);
+      }
+    }
+  }, [startTime]);
+
+  const formatTime = (seconds: number) => {
+    const safeSeconds = Math.max(0, Math.floor(seconds));
+    return `${String(Math.floor(safeSeconds / 3600)).padStart(2, "0")}:${String(Math.floor((safeSeconds % 3600) / 60)).padStart(2, "0")}:${String(safeSeconds % 60).padStart(2, "0")}`;
+  };
+
+  useEffect(() => {
+    if (videoRef.current && startTime !== undefined && Number.isFinite(videoRef.current.duration)) {
+      videoRef.current.currentTime = startTime;
+      setActualCurrentTime(startTime);
+    }
+  }, [startTime, src]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -65,7 +108,7 @@ export function VideoPreview({ src, duration, currentTime = "00:00:00", onPlayPa
   }, [isPlaying]);
 
   return (
-    <div className={`relative bg-zinc-950 rounded-2xl overflow-hidden aspect-video ${className}`}>
+    <div ref={frameRef} className={`video-preview-frame relative mx-auto overflow-hidden rounded-2xl bg-zinc-950 ${className}`}>
       {/* Video Canvas */}
       <div className="w-full h-full flex items-center justify-center">
         {src ? (
@@ -74,6 +117,7 @@ export function VideoPreview({ src, duration, currentTime = "00:00:00", onPlayPa
             src={src}
             className="w-full h-full object-contain"
             onClick={handlePlayPause}
+            onLoadedMetadata={handleLoadedMetadata}
           />
         ) : (
           <div className="flex flex-col items-center gap-3">
@@ -101,17 +145,17 @@ export function VideoPreview({ src, duration, currentTime = "00:00:00", onPlayPa
               {isLocalPlaying ? <Pause size={14} className="text-white" /> : <Play size={14} className="text-white ml-0.5" />}
             </button>
             <div className="flex items-center gap-1 text-white/70 text-xs font-mono">
-              <span>{currentTime}</span>
+              <span>{actualDuration !== null ? formatTime(actualCurrentTime) : currentTime}</span>
               <span>/</span>
-              <span>{duration || "00:00:00"}</span>
+              <span>{actualDuration !== null ? formatTime(actualDuration) : duration || "00:00:00"}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-              <Volume2 size={12} className="text-white/70" />
+            <button onClick={handleMute} className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20" aria-label={isMuted ? "Unmute video" : "Mute video"}>
+              <Volume2 size={12} className={isMuted ? "text-white/40" : "text-white/70"} />
             </button>
-            <button className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+            <button onClick={handleFullscreen} className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20" aria-label="Fullscreen preview">
               <Maximize size={12} className="text-white/70" />
             </button>
           </div>

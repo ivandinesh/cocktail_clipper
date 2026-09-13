@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { LayoutDashboard, FolderOpen, Film, Scissors, Layers, Download, Settings, ChevronDown } from "lucide-react";
 
 interface SidebarProps {
@@ -22,17 +22,35 @@ const sections = [
 ];
 
 export function Sidebar({ activeSection, onSectionChange, projectName, stats }: SidebarProps) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get("projectId");
+
+  const handleSectionChange = (section: string) => {
+    onSectionChange(section);
+    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+    const routes: Record<string, string> = {
+      overview: `/${query}`,
+      sources: `/${query}`,
+      scenes: `/scenes${query}`,
+      clips: `/clips${query}`,
+      stitch: `/stitch${query}`,
+      exports: `/export${query}`,
+    };
+    navigate(routes[section] || `/${query}`);
+  };
+
   return (
-    <aside className="w-56 bg-white/80 backdrop-blur-xl border-r border-zinc-200/60 flex flex-col h-full">
+    <aside className="w-60 bg-white/75 backdrop-blur-xl border-r border-slate-200/80 flex flex-col h-full relative z-10">
       {/* Project Name */}
-      <div className="px-4 py-4 border-b border-zinc-100">
+      <div className="px-4 py-5 border-b border-slate-200/80">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-            ◆
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center text-white text-sm font-black shadow-lg shadow-indigo-500/30">
+            ✦
           </div>
-          <span className="text-sm font-semibold text-zinc-900 truncate">{projectName}</span>
+          <span className="text-sm font-bold text-slate-900 truncate">{projectName}</span>
         </div>
-        <div className="flex items-center gap-1 text-xs text-zinc-400">
+        <div className="flex items-center gap-1 text-xs text-slate-500">
           <ChevronDown size={12} />
           <span>Project</span>
         </div>
@@ -40,21 +58,21 @@ export function Sidebar({ activeSection, onSectionChange, projectName, stats }: 
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5">
-        <p className="px-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">PROJECT</p>
+        <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-[0.18em] mb-3">Workspace</p>
         {sections.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => onSectionChange(id)}
+            onClick={() => handleSectionChange(id)}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-150 ${
               activeSection === id
-                ? "bg-blue-50 text-blue-700 font-medium"
-                : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                ? "bg-violet-50 text-violet-700 font-semibold shadow-sm"
+                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
             }`}
           >
             <Icon size={16} />
             {label}
             {stats && stats[id as keyof typeof stats] !== undefined && (
-              <span className="ml-auto text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-full">
+              <span className="ml-auto text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                 {stats[id as keyof typeof stats]}
               </span>
             )}
@@ -63,8 +81,8 @@ export function Sidebar({ activeSection, onSectionChange, projectName, stats }: 
       </nav>
 
       {/* Files Section */}
-      <div className="border-t border-zinc-100 py-3 px-2">
-        <p className="px-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">FILES</p>
+      <div className="border-t border-slate-200/80 py-4 px-2">
+        <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-[0.18em] mb-2">Files</p>
         <div className="space-y-0.5 px-2">
           {[
             { name: "source.mp4", icon: "🎬" },
@@ -73,7 +91,7 @@ export function Sidebar({ activeSection, onSectionChange, projectName, stats }: 
           ].map((file) => (
             <button
               key={file.name}
-              className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-all"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all"
             >
               <span>{file.icon}</span>
               <span className="truncate">{file.name}</span>
@@ -83,8 +101,8 @@ export function Sidebar({ activeSection, onSectionChange, projectName, stats }: 
       </div>
 
       {/* Settings */}
-      <div className="border-t border-zinc-100 py-3 px-2">
-        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 transition-all">
+      <div className="border-t border-slate-200/80 py-4 px-2">
+        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">
           <Settings size={16} />
           Settings
         </button>
