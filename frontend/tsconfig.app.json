@@ -22,11 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
-  "exclude": [
-    "src/components/**",
-    "src/pages/**",
-    "src/stores/**",
-    "src/hooks/**"
-  ]
+  "include": ["src"]
 }

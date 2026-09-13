@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
+import type { Scene } from "../types";
 import { SceneCard } from "../components/media/SceneCard";
 import { Button } from "../components/ui";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -21,7 +22,7 @@ export function Scenes() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState(0);
 
-  const scenes = project?.scenes || [];
+  const scenes: Scene[] = project?.scenes || [];
 
   const handleAnalyze = async () => {
     if (!projectId) return;
@@ -38,7 +39,7 @@ export function Scenes() {
           setAnalyzing(false);
           setProcessing({ active: false, operation: "", progress: 100, current: 27, total: 27, items: [] });
           // Mock scenes
-          const mockScenes = Array.from({ length: 27 }, (_, i) => ({
+          const mockScenes: Scene[] = Array.from({ length: 27 }, (_, i) => ({
             id: `scene-${i + 1}`,
             index: i,
             start: `${String(Math.floor(i * 15 / 60)).padStart(2, "0")}:${String(i * 15 % 60).padStart(2, "0")}:00.000`,
@@ -61,7 +62,7 @@ export function Scenes() {
     setSelectedScene(selectedSceneIndex === index ? null : index);
   };
 
-  const handlePreview = (scene: any) => {
+  const handlePreview = (_scene: Scene) => {
     // Preview scene
   };
 
@@ -128,7 +129,7 @@ export function Scenes() {
         />
       ) : (
         <div className={viewMode === "grid" ? "grid grid-cols-3 gap-4" : "space-y-3"}>
-          {scenes.map((scene: any, i: number) => (
+          {scenes.map((scene: Scene, i: number) => (
             <SceneCard
               key={scene.id}
               scene={scene}

@@ -1,4 +1,4 @@
-import { Scene } from "../../types";
+import type { Scene } from "../../types";
 import { Play, Check, Clock } from "lucide-react";
 
 interface SceneCardProps {
@@ -16,11 +16,13 @@ export function SceneCard({ scene, isSelected, onSelect, onPreview, viewMode = "
   };
 
   const duration = (() => {
-    const [hs, ms] = scene.start.split(":");
-    const [he, me] = scene.end.split(":");
-    const sSec = parseInt(hs) * 3600 + parseInt(ms) * 60 + parseFloat(he);
-    const eSec = parseInt(he) * 3600 + parseInt(me) * 60 + parseFloat(me);
-    const diff = eSec - sSec;
+    const parts = scene.start.split(":");
+    const [hs, ms, ss] = parts;
+    const startSec = parseInt(hs) * 3600 + parseInt(ms) * 60 + parseFloat(ss);
+    const endParts = scene.end.split(":");
+    const [he, me, se] = endParts;
+    const endSec = parseInt(he) * 3600 + parseInt(me) * 60 + parseFloat(se);
+    const diff = endSec - startSec;
     return `${Math.floor(diff / 60)}m ${Math.floor(diff % 60)}s`;
   })();
 

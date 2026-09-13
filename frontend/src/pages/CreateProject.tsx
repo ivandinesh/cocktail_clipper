@@ -53,7 +53,7 @@ export function CreateProject() {
 
       const data = await res.json();
       addToast({ type: "success", title: "Project Created", message: `Project "${data.project_name}" is ready` });
-      navigate(`/dashboard?projectId=${data.project_id}`);
+      navigate(`/?projectId=${data.project_id}`);
     } catch (err: any) {
       setError(err.message || "Failed to create project");
       addToast({ type: "error", title: "Creation Failed", message: err.message });

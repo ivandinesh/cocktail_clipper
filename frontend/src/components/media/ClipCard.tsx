@@ -1,5 +1,5 @@
-import { Clip } from "../../types";
-import { Play, Check, Clock, Trash2, Edit3 } from "lucide-react";
+import type { Clip } from "../../types";
+import { Play, Check, Clock, Trash2 } from "lucide-react";
 
 interface ClipCardProps {
   clip: Clip;
@@ -17,11 +17,13 @@ export function ClipCard({ clip, isSelected, onSelect, onPreview, onInclude, onD
   };
 
   const duration = (() => {
-    const [hs, ms] = clip.start.split(":");
-    const [he, me] = clip.end.split(":");
-    const sSec = parseInt(hs) * 3600 + parseInt(ms) * 60 + parseFloat(he);
-    const eSec = parseInt(he) * 3600 + parseInt(me) * 60 + parseFloat(me);
-    return `${Math.floor((eSec - sSec) / 60)}m ${Math.floor((eSec - sSec) % 60)}s`;
+    const parts = clip.start.split(":");
+    const [hs, ms, ss] = parts;
+    const startSec = parseInt(hs) * 3600 + parseInt(ms) * 60 + parseFloat(ss);
+    const endParts = clip.end.split(":");
+    const [he, me, se] = endParts;
+    const endSec = parseInt(he) * 3600 + parseInt(me) * 60 + parseFloat(se);
+    return `${Math.floor((endSec - startSec) / 60)}m ${Math.floor((endSec - startSec) % 60)}s`;
   })();
 
   return (

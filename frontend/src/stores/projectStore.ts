@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Project, Clip, Scene, ProcessingState, ToastMessage } from "../types";
+import type { Project, Clip, Scene, ProcessingState, ToastMessage } from "../types";
 
 interface ProjectStore {
   project: Project | null;

@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { X } from "lucide-react";
 
 interface ToastProps {
@@ -46,7 +46,7 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   return (
     <div className="fixed bottom-4 right-4 z-[100] space-y-2">
       {toasts.map((t) => (
-        <Toast key={t.id} type={t.type as any} title={t.title} message={t.message} onClose={() => onRemove(t.id)} />
+        <Toast key={t.id} type={t.type as ToastProps["type"]} title={t.title} message={t.message} onClose={() => onRemove(t.id)} />
       ))}
     </div>
   );

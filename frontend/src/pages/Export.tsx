@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
+import type { Clip } from "../types";
+import { Timeline } from "../components/media/Timeline";
 import { Button } from "../components/ui";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ProgressBar } from "../components/ui";
@@ -14,7 +16,7 @@ export function Export() {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportComplete, setExportComplete] = useState(false);
 
-  const clips = project?.clips?.filter((c: any) => c.status === "completed") || [];
+  const clips: Clip[] = project?.clips?.filter((c: Clip) => c.status === "completed") || [];
 
   const handleExport = async () => {
     if (!projectId) return;
@@ -72,17 +74,10 @@ export function Export() {
             <div className="card p-6">
               <h2 className="text-lg font-semibold text-zinc-900 mb-4">Export Settings</h2>
               <div className="space-y-4">
-                {[
-                  ["Filename", "final-video.mp4"],
-                  ["Resolution", "Original / 1080p / 720p"],
-                  ["Aspect Ratio", "Original / 16:9 / 9:16 / 1:1"],
-                  ["Captions", "On / Off"],
-                  ["Hook", "On / Off"],
-                  ["End Hook", "On / Off"],
-                ].map(([label, value]) => (
+                {["Filename", "Resolution", "Aspect Ratio", "Captions", "Hook", "End Hook"].map((label) => (
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-sm text-zinc-600">{label}</span>
-                    <span className="text-sm font-medium text-zinc-900">{value}</span>
+                    <span className="text-sm font-medium text-zinc-900">Original</span>
                   </div>
                 ))}
               </div>

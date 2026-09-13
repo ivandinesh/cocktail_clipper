@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
+import type { Clip } from "../types";
 import { ClipCard } from "../components/media/ClipCard";
 import { Button } from "../components/ui";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -10,8 +11,9 @@ import { ProgressBar } from "../components/ui";
 export function Clips() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("projectId");
+  const navigate = useNavigate();
   const project = useProjectStore((s) => s.project);
-  const clips = project?.clips || [];
+  const clips: Clip[] = project?.clips || [];
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [cutting, setCutting] = useState(false);
   const [cutProgress, setCutProgress] = useState(0);
@@ -35,11 +37,11 @@ export function Clips() {
     }, 500);
   };
 
-  const handleInclude = (clipId: string) => {
+  const handleInclude = (_clipId: string) => {
     // Toggle include
   };
 
-  const handleDelete = (clipId: string) => {
+  const handleDelete = (_clipId: string) => {
     // Delete clip
   };
 
@@ -65,7 +67,7 @@ export function Clips() {
             progress: cutProgress,
             current: Math.floor(cutProgress / 10),
             total: clips.length,
-            items: clips.map((c: any, i: number) => ({
+            items: clips.map((c: Clip, i: number) => ({
               id: c.id,
               name: c.title,
               status: i < Math.floor(cutProgress / 10) ? "completed" : i === Math.floor(cutProgress / 10) ? "processing" : "waiting",
@@ -81,11 +83,11 @@ export function Clips() {
         <EmptyState
           title="No clips yet"
           description="Select scenes from the Scenes view and create your first clips."
-          action={{ label: "Review Scenes", onClick: () => window.location.href = "/scenes" }}
+          action={{ label: "Review Scenes", onClick: () => { navigate("/scenes"); } }}
         />
       ) : (
         <div className="grid grid-cols-3 gap-4">
-          {clips.map((clip: any) => (
+          {clips.map((clip: Clip) => (
             <ClipCard
               key={clip.id}
               clip={clip}

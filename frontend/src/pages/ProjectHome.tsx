@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
+import type { Project } from "../types";
 import { VideoPreview } from "../components/media/VideoPreview";
 import { Button } from "../components/ui";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -22,10 +23,10 @@ export function ProjectHome() {
     setLoading(true);
     fetch(`http://localhost:8000/projects/${projectId}`)
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: Project) => {
         setProject(data);
         setProjectId(projectId);
-        const completed = data.clips?.filter((c: any) => c.status === "completed").length || 0;
+        const completed = data.clips?.filter((c) => c.status === "completed").length || 0;
         const total = data.clips?.length || 0;
         if (total === 0) setStatus("Ready");
         else if (completed === 0) setStatus("Analyze transcript…");
@@ -50,8 +51,8 @@ export function ProjectHome() {
     );
   }
 
-  const completed = project.clips?.filter((c: any) => c.status === "completed").length || 0;
-  const cut = project.clips?.filter((c: any) => c.status === "cut").length || 0;
+  const completed = project.clips?.filter((c) => c.status === "completed").length || 0;
+  const cut = project.clips?.filter((c) => c.status === "cut").length || 0;
   const total = project.clips?.length || 0;
   const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -106,20 +107,20 @@ export function ProjectHome() {
             <div className="grid grid-cols-2 gap-4">
               {[
                 ["Filename", project.source.video],
-                ["Duration", "—"],
-                ["Resolution", "—"],
-                ["Transcript", project.source.subtitle ? "✓ Loaded" : "—"],
-                ["Scenes", project.scenes?.length || 0],
-                ["Clips", total],
-                ["Last Processed", "—"],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <p className="text-xs text-zinc-400">{label}</p>
-                  <p className="text-sm font-medium text-zinc-900 mt-0.5">{value}</p>
-                </div>
-              ))}
-            </div>
+              ["Duration", "—"],
+              ["Resolution", "—"],
+              ["Transcript", project.source.subtitle ? "✓ Loaded" : "—"],
+              ["Scenes", project.scenes?.length || 0],
+              ["Clips", total],
+              ["Last Processed", "—"],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs text-zinc-400">{label}</p>
+                <p className="text-sm font-medium text-zinc-900 mt-0.5">{value}</p>
+              </div>
+            ))}
           </div>
+        </div>
         </div>
 
         {/* Right: Workflow */}

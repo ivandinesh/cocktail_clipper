@@ -1,16 +1,17 @@
 # CocktailClips — Local AI Video Clipper
 
-Build a complete local application that automatically cuts and prepares short-form videos from a source video and transcript (SRT). Everything runs locally — no cloud services required.
+An Apple-inspired media workspace for cutting and preparing short-form videos from source video and transcript (SRT). Everything runs locally — no cloud services required.
 
 ## 📖 Project Overview
 
-**CocktailClips** is a desktop application that cuts and prepares short-form videos from a source video and transcript (SRT). It uses a master `project.json` as the single source of truth.
+**CocktailClips** is a desktop media application that transforms long videos into short-form clips using AI scene analysis. It features a polished macOS-inspired interface inspired by Final Cut Pro and iMovie, with a master `project.json` as the single source of truth.
 
 ### Core Philosophy
 - **Single source of truth**: A master `project.json` file that every tool updates
 - **Local-first**: No cloud dependencies; everything runs on your machine
 - **Cross-platform**: macOS/Linux first, then Windows compatible
 - **No Docker**: Native execution only
+- **Visual editing**: Interact visually with scenes, clips, and sequences; advanced users can edit JSON directly
 
 ### Tech Stack
 | Layer | Technology |
@@ -19,8 +20,11 @@ Build a complete local application that automatically cuts and prepares short-fo
 | Backend | FastAPI (Python 3.11+) |
 | Video processing | FFmpeg (via Python wrappers) |
 | Subtitle processing | pysubs2 |
-| Styling | Tailwind dark UI (minimalist modern) |
+| Styling | Apple-inspired light theme (Tailwind) |
+| State management | Zustand |
+| Icons | Lucide React (thin-line) |
 | Routing | React Router DOM v7 |
+| TypeScript | 6 with strict project references |
 
 ## 🚀 Quick Start
 
@@ -50,33 +54,90 @@ npm run dev
 ```
 
 ### Full Workflow
-1. **Create Project** — Upload MP4 + SRT, enter project name
-2. **Import AI Scenes** (optional) — Upload AI-generated JSON with clip timestamps
-3. **Cut Clips** — Specify start/end times, extract video segments with subtitles
-4. **Review Clips** — View all clips in the table with status, preview, download
-5. **Branding Settings** — Configure channel name, intro/outro durations, outro text
-6. **Stitch & Brand** — Combine all clips with intro/outro branding into final videos
-7. **Download** — Download final branded videos directly from the UI
+1. **Create Project** — Drop your video (MP4) and optional SRT/transcript
+2. **Analyze** — AI detects scenes from transcript
+3. **Review Scenes** — Visual cards with thumbnails, importance scores, tags
+4. **Select & Cut** — Choose scenes, create clips with FFmpeg
+5. **Review Clips** — Media-browser style clip library with preview
+6. **Stitch** — Drag-and-drop timeline to arrange clips
+7. **Add Hook/Captions** — Opening hook, caption style, end hook
+8. **Export** — Render final video with progress tracking
+
+## 🎨 Design System
+
+The frontend follows Apple's human interface guidelines:
+
+- **Light theme**: `#f5f5f7` background, white panels, `#1d1d1f` text
+- **Accent**: Apple blue `#0071e3`
+- **Font stack**: `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Helvetica Neue', Arial`
+- **Border radius**: 8-10px controls, 14px cards, 16-24px dialogs
+- **Glass morphism**: Selective use on toolbar, sidebar, inspector (`backdrop-filter: blur(20px)`)
+- **Motion**: 150-250ms transitions, `prefers-reduced-motion` support
+- **Typography**: Weight and size establish hierarchy, not excessive boxes
+
+### Layout
+```
+┌──────────────────────────────────────────────────────────┐
+│ Project Name              Status        Export             │  ← TopToolbar
+├────────────┬─────────────────────────────┬─────────────────┤
+│            │                             │                 │
+│ PROJECT    │     VIDEO PREVIEW           │   INSPECTOR     │
+│            │                             │   (contextual)  │
+│ Sources    │                             │                 │
+│ Scenes     │                             │                 │
+│ Clips      │                             │                 │
+│ Stitch     │                             │                 │
+│ Exports    │                             │                 │
+│            │                             │                 │
+├────────────┴─────────────────────────────┴─────────────────┤
+│                    CLIP / SCENE TIMELINE                   │  ← Timeline
+└──────────────────────────────────────────────────────────┘
+```
+
+### Keyboard Shortcuts
+- **Space** — Play/Pause
+- **← / →** — Seek
+- **I / O** — Mark In/Out
+- **Cmd/Ctrl + S** — Save Project
+- **Cmd/Ctrl + E** — Export
+- **Delete** — Remove selected item
+- **Esc** — Close dialog / Deselect
+- **?** — Keyboard shortcuts help
 
 ## 📐 Project Structure
 ```
 cocktailclips/
-├── frontend/           # React Vite app (React 19 + Vite 8 + Tailwind 4)
+├── frontend/           # React Vite app (Apple-inspired media workspace)
 │   ├── src/
-│   │   ├── App.tsx          # Main app with React Router navigation
-│   │   ├── CreateProject.tsx # Project creation with file upload
-│   │   ├── Dashboard.tsx    # Project dashboard with clip list
-│   │   ├── ClipsTable.tsx   # Clips table with actions (recut, restitch, download)
-│   │   ├── BrandingSettings.tsx # Edit channel, durations, outro text
-│   │   ├── ImportScenes.tsx # Upload AI-generated JSON scenes
-│   │   ├── ClipCutter.tsx   # Cut clips from source video
-│   │   ├── StitchPanel.tsx  # Stitch clips with branding + download
-│   │   ├── main.tsx         # Entry point with BrowserRouter
-│   │   └── index.css        # Tailwind directives + custom styles
-│   ├── index.html           # HTML entry point (title: CocktailClips)
-│   ├── vite.config.ts       # Vite config with API proxy to backend
-│   ├── postcss.config.ts    # PostCSS using @tailwindcss/postcss
-│   ├── tailwind.config.ts   # Tailwind CSS configuration
+│   │   ├── App.tsx              # Main app with Apple layout (TopToolbar + Sidebar + Inspector)
+│   │   ├── pages/               # Route-based page components
+│   │   │   ├── CreateProject.tsx  # Drag-and-drop project creation
+│   │   │   ├── ProjectHome.tsx    # Dashboard with workflow progression
+│   │   │   ├── Scenes.tsx         # Scene grid/list with AI analysis
+│   │   │   ├── Clips.tsx          # Clip review and cutting
+│   │   │   ├── Stitch.tsx         # Timeline-based stitch workspace
+│   │   │   ├── Export.tsx         # Export settings and progress
+│   │   │   └── MasterJSON.tsx     # Visual/JSON mode editor
+│   │   ├── components/
+│   │   │   ├── layout/          # AppShell, TopToolbar, Sidebar, Inspector
+│   │   │   ├── media/           # SceneCard, ClipCard, VideoPreview, Timeline
+│   │   │   ├── ui/              # Button, Badge, Card, Input, Select, Spinner, ProgressBar, DropZone, EmptyState, Toast
+│   │   │   ├── workflow/        # ProcessingStatus, JSONEditor
+│   │   │   └── components.ts    # Barrel exports
+│   │   ├── stores/
+│   │   │   └── projectStore.ts  # Zustand state management
+│   │   ├── hooks/
+│   │   │   ├── useKeyboardShortcuts.ts
+│   │   │   ├── useAsync.ts
+│   │   │   └── useLocalStorage.ts
+│   │   ├── types/
+│   │   │   └── index.ts         # Project, Clip, Scene, ProcessingState, ToastMessage
+│   │   ├── index.css            # Apple-inspired design system
+│   │   └── main.tsx             # Entry point
+│   ├── index.html
+│   ├── vite.config.ts           # Vite config with API proxy to backend
+│   ├── tsconfig.app.json
+│   ├── tsconfig.node.json
 │   └── package.json
 ├── backend/            # FastAPI Python app
 │   ├── app/
@@ -103,28 +164,26 @@ cocktailclips/
 
 ## 🎨 Frontend Pages
 
-### Dashboard
-Show all projects with clip count and progress. Click a project to view clips.
+### Create Project
+Drag-and-drop video file (MP4), optional SRT/transcript, or import project JSON. Clean hero screen with project name input.
 
-### Project View
-Display source video, subtitle upload status, number of clips, and progress bar.
+### Project Home
+Immediately answers: What video am I working on? What stage is the project in? What should I do next? Shows source video preview, project info, and a clean workflow progression (Source → Analyze → Select → Cut → Stitch → Export) with completion indicators.
 
-### Clips Table
-Columns: Clip ID, Start, End, Title, Status, Clip File, Final File, Actions.
-Each row has: Preview (↓), Recut, Restitch, Edit Hook, Edit Title, Download.
+### Scenes
+AI-detected scenes displayed as visual cards in Grid or List view. Each card shows thumbnail, timestamp range, title, AI summary, importance score, and tags. Click to preview, select for clipping.
 
-### Branding Settings
-Editable: Channel name, Intro duration, Outro duration, Outro text.
-Saved into project.json via PATCH API.
+### Clips
+Media-browser style clip library. Each clip shows thumbnail, name, duration, source timestamp, and status. Hover reveals actions: Play, Rename, Include/Exclude, Delete, Edit Start/End, Add to Stitch.
 
-### Import Scenes
-Upload AI-generated JSON containing scenes with start/end/title/hook/next_hook.
+### Stitch
+Horizontal timeline for arranging clips. Drag-and-drop reordering. Shows total output duration. Inspector panel for selected clip properties.
 
-### Clip Cutter
-Enter start/end times and optional title to cut a clip from the source video.
+### Export
+Clean export settings sheet with resolution, aspect ratio, captions, hook options. Progress tracking during rendering. Export complete with file details and actions.
 
-### Stitch Panel
-Stitch all cut clips with intro/outro branding. Download final videos.
+### Master JSON
+Two-mode editor: Visual (understandable UI controls) and JSON (polished code editor with syntax highlighting, validate, format, copy, save).
 
 ## 🔧 API Reference
 
@@ -143,8 +202,9 @@ Stitch all cut clips with intro/outro branding. Download final videos.
 | `GET /projects/{id}/clips/{clipId}/preview` | Preview clip | Stream preview video file |
 | `GET /projects/{id}/download` | Download final | Download final stitched video |
 
-## 📦 Python Dependencies
+## 📦 Dependencies
 
+### Python
 ```powershell
 cd backend
 python -m venv venv
@@ -152,7 +212,7 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### requirements.txt
+**requirements.txt:**
 ```
 fastapi>=0.100.0
 uvicorn[standard]>=0.27.0
@@ -161,40 +221,35 @@ ffmpeg-python>=0.2.0
 python-multipart>=0.0.6
 ```
 
-**System Requirements:**
-- FFmpeg must be installed and available on PATH
-- Windows: `winget install FFmpeg` or download from ffmpeg.org
-- macOS: `brew install ffmpeg`
-- Linux: `sudo apt install ffmpeg`
-
-## 📦 Frontend Dependencies
-
+### Frontend
 ```powershell
 cd frontend
 npm install
 ```
 
-### Key Dependencies
+**Key dependencies:**
 - React 19 + ReactDOM 19
 - React Router DOM 7
 - Vite 8 + @vitejs/plugin-react 6
 - Tailwind CSS 4 + @tailwindcss/postcss 4
 - TypeScript 6
+- Zustand (state management)
+- Lucide React (icons)
 
 ## 🎯 Features
 
 ### Phase 1 — Foundation ✅
-- Project creation with MP4 + SRT uploads
+- Project creation with drag-and-drop MP4 + SRT uploads
 - Automatic project.json generation
 - AI scene import from JSON files
-- Project dashboard listing all projects
+- Apple-inspired media workspace layout
 
 ### Phase 2 — Clip Cutter ✅
 - FFmpeg `cut_clip()` wrapper with timestamp validation
 - pysubs2 subtitle integration with timestamp shifting
 - ASS subtitle file generation and burning into video
 - Clip status tracking (planned → cut → completed)
-- Clips Table with recut, restitch, edit, and download actions
+- Media-browser style clip review
 
 ### Phase 3 — Stitch / Branding ✅
 - FFmpeg `stitch_video()` wrapper with progress tracking
@@ -206,12 +261,18 @@ npm install
 - Download final stitched videos from UI
 
 ### Phase 4 — Polish ✅
-- Progress indicators during FFmpeg operations
-- Download buttons for clips and final videos
-- Recut and Restitch functionality per clip
-- Branding settings page
-- Import scenes page
-- Minimalist modern dark UI
+- Apple-inspired light theme design system
+- macOS-style top toolbar with status indicators
+- Glass morphism on toolbar, sidebar, inspector
+- Contextual Inspector panel
+- Processing feedback with individual item progress
+- Toast notifications
+- Keyboard shortcuts (Space, ←→, I/O, Cmd+S, Cmd+E, ?)
+- Drag-and-drop interactions
+- Grid/List view toggle for scenes
+- Visual/JSON mode toggle for master JSON
+- Empty states with actionable guidance
+- `prefers-reduced-motion` support
 
 ## 🔧 FFmpeg Wrappers
 
@@ -288,4 +349,4 @@ Uses pysubs2 for subtitle processing:
 
 ---
 
-*CocktailClips — Making video clipping simple, local, and private.*
+*CocktailClips — Making video clipping simple, local, and private. Designed like a premium native macOS media tool.*

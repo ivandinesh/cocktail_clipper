@@ -1,4 +1,4 @@
-import { ProcessingState } from "../../types";
+import type { ProcessingState } from "../../types";
 import { Loader2, Check, Circle } from "lucide-react";
 
 interface ProcessingStatusProps {

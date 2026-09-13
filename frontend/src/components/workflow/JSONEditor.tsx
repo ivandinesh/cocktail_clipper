@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Copy, Download, Upload, Wand2, Code, AlertCircle } from "lucide-react";
-import { Project } from "../../types";
+import type { Project } from "../../types";
 import { Button } from "../ui";
 import { ProgressBar } from "../ui";
 
@@ -20,8 +20,8 @@ export function JSONEditor({ project, onSave }: JSONEditorProps) {
       const parsed = JSON.parse(jsonText);
       setJsonText(JSON.stringify(parsed, null, 2));
       setError(null);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError((e as Error).message);
     }
   };
 
@@ -31,8 +31,8 @@ export function JSONEditor({ project, onSave }: JSONEditorProps) {
       setError(null);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError((e as Error).message);
     }
   };
 

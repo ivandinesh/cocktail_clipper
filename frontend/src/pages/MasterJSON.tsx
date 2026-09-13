@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
+import type { Project } from "../types";
 import { JSONEditor } from "../components/workflow/JSONEditor";
 import { Button } from "../components/ui";
 
@@ -38,7 +39,7 @@ export function MasterJSON() {
       </div>
 
       <div className="card p-6">
-        <JSONEditor project={project || { project: {}, source: {}, branding: {}, clips: [] }} onSave={handleSave} />
+        <JSONEditor project={project || { project: { id: "", name: "" }, source: { video: "", subtitle: "" }, branding: { channel: "", intro_duration: 0, outro_duration: 0, outro_text: "" }, clips: [] }} onSave={handleSave} />
       </div>
     </div>
   );

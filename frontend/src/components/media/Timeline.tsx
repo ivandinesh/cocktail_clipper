@@ -1,5 +1,4 @@
-import { Scene } from "../../types";
-import { Clock } from "lucide-react";
+import type { Scene } from "../../types";
 
 interface TimelineProps {
   scenes: Scene[];
@@ -10,13 +9,18 @@ interface TimelineProps {
 
 export function Timeline({ scenes, selectedIndex, onSelect, onReorder }: TimelineProps) {
   const formatTime = (time: string) => {
-    const [h, m, s] = time.split(":").map(Number);
+    const parts = time.split(":");
+    const [h, m, s] = parts;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
   const getProgress = (scene: Scene) => {
-    const start = parseInt(scene.start.split(":")[0]) * 3600 + parseInt(scene.start.split(":")[1]) * 60 + parseFloat(scene.start.split(":")[2]);
-    const end = parseInt(scene.end.split(":")[0]) * 3600 + parseInt(scene.end.split(":")[1]) * 60 + parseFloat(scene.end.split(":")[2]);
+    const parts = scene.start.split(":");
+    const [hs, ms, ss] = parts;
+    const start = parseInt(hs) * 3600 + parseInt(ms) * 60 + parseFloat(ss);
+    const endParts = scene.end.split(":");
+    const [he, me, se] = endParts;
+    const end = parseInt(he) * 3600 + parseInt(me) * 60 + parseFloat(se);
     return end - start;
   };
 

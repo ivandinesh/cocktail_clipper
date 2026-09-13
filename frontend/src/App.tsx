@@ -1,61 +1,121 @@
-import { Routes, Route, NavLink } from "react-router-dom";
-import "./index.css";
-import Dashboard from "./Dashboard";
-import BrandingSettings from "./BrandingSettings";
-import ImportScenes from "./ImportScenes";
-import ClipCutter from "./ClipCutter";
-import StitchPanel from "./StitchPanel";
-import CreateProject from "./CreateProject";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useCallback } from "react";
+import { TopToolbar } from "./components/layout/TopToolbar";
+import { Sidebar } from "./components/layout/Sidebar";
+import { CreateProject } from "./pages/CreateProject";
+import { ProjectHome } from "./pages/ProjectHome";
+import { Scenes } from "./pages/Scenes";
+import { Clips } from "./pages/Clips";
+import { Stitch } from "./pages/Stitch";
+import { Export } from "./pages/Export";
+import { MasterJSON } from "./pages/MasterJSON";
+import { Inspector } from "./components/layout/Inspector";
+import { useProjectStore } from "./stores/projectStore";
+import { ToastContainer } from "./components/ui/Toast";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import type { Clip } from "./types";
 
-const navLinks = [
-  { to: "/", label: "✦ Create", end: true },
-  { to: "/dashboard", label: "📊 Dashboard" },
-  { to: "/branding", label: "🎨 Branding" },
-  { to: "/import", label: "📥 Import" },
-  { to: "/cut", label: "✂️ Cut" },
-  { to: "/stitch", label: "🧵 Stitch" },
-];
+function ProjectLayout() {
+  const { selectedClipId, setSelectedClip } = useProjectStore();
 
-export default function App() {
   return (
-    <div className="app-bg min-h-screen text-white">
-      <header className="nav-glass sticky top-0 z-50">
-        <nav className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <NavLink to="/" className="flex items-center gap-3 no-underline">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-lg font-bold shadow-lg shadow-blue-500/20">
-              ◆
-            </div>
-            <span className="text-xl font-bold tracking-tight text-white">
-              Cocktail<span className="text-blue-400">Clips</span>
-            </span>
-          </NavLink>
-          <div className="flex gap-2 flex-wrap">
-            {navLinks.map(({ to, label, end }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? "active" : ""}`
-                }
-              >
-                {label}
-              </NavLink>
-            ))}
-          </div>
-        </nav>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-6 py-8">
+    <div className="flex flex-1 overflow-hidden">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col overflow-hidden">
         <Routes>
-          <Route path="/" element={<CreateProject />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/branding" element={<BrandingSettings />} />
-          <Route path="/import" element={<ImportScenes />} />
-          <Route path="/cut" element={<ClipCutter />} />
-          <Route path="/stitch" element={<StitchPanel />} />
+          <Route path="/" element={<ProjectHome />} />
+          <Route path="/scenes" element={<Scenes />} />
+          <Route path="/clips" element={<Clips />} />
+          <Route path="/stitch" element={<Stitch />} />
+          <Route path="/export" element={<Export />} />
+          <Route path="/json" element={<MasterJSON />} />
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
+
+      {/* Inspector */}
+      {selectedClipId && (
+        <Inspector title="Inspector" onClose={() => setSelectedClip(null)}>
+          <div className="space-y-4">
+            <div className="p-3 bg-zinc-50 rounded-xl">
+              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Clip</label>
+              <p className="text-sm text-zinc-900 mt-1">{selectedClipId}</p>
+            </div>
+            <div className="p-3 bg-zinc-50 rounded-xl">
+              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Status</label>
+              <span className="text-sm text-zinc-900 mt-1 inline-block">Selected</span>
+            </div>
+          </div>
+        </Inspector>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  const {
+    projectId,
+    project,
+    selectedClipId,
+    setSelectedClip,
+    setSidebarSection,
+    processing,
+    addToast,
+  } = useProjectStore();
+
+  const handleExport = useCallback(() => {
+    if (!projectId) return;
+    addToast({ type: "info", title: "Export", message: "Starting export..." });
+  }, [projectId, addToast]);
+
+  const handleSettings = useCallback(() => {
+    addToast({ type: "info", title: "Settings", message: "Settings panel coming soon" });
+  }, [addToast]);
+
+  const canExport = Boolean(project && project.clips.some((c: Clip) => c.status === "completed"));
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: " ", action: () => { /* Play/Pause will be handled by VideoPreview */ } },
+    { key: "?", action: () => addToast({ type: "info", title: "Keyboard Shortcuts", message: "Space: Play/Pause | ←→: Seek | I/O: In/Out | Cmd+S: Save | Cmd+E: Export" }) },
+  ], !!projectId);
+
+  return (
+    <div className="h-screen flex flex-col bg-zinc-50 text-zinc-900 overflow-hidden">
+      <TopToolbar
+        projectName={project?.project.name || "CocktailClips"}
+        status={processing.active ? processing.operation : "Ready"}
+        processing={processing.active}
+        progress={processing.progress}
+        onExport={handleExport}
+        onSettings={handleSettings}
+        canExport={canExport}
+      />
+
+      <div className="flex flex-1 overflow-hidden">
+        {projectId ? (
+          <>
+            <Sidebar
+              activeSection={useProjectStore((s) => s.sidebarSection)}
+              onSectionChange={(section) => setSidebarSection(section)}
+              projectName={project?.project.name || "CocktailClips"}
+              stats={{
+                scenes: project?.scenes?.length || 0,
+                clips: project?.clips?.length || 0,
+                exports: 0,
+              }}
+            />
+            <ProjectLayout />
+          </>
+        ) : (
+          <CreateProject />
+        )}
+      </div>
+
+      <ToastContainer
+        toasts={useProjectStore((s) => s.toasts)}
+        onRemove={(id) => useProjectStore.getState().removeToast(id)}
+      />
     </div>
   );
 }

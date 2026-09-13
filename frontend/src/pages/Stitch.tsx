@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
+import type { Clip, Scene } from "../types";
 import { Timeline } from "../components/media/Timeline";
 import { Button } from "../components/ui";
-import { EmptyState } from "../components/ui/EmptyState";
+import { ProcessingStatus } from "../components/workflow/ProcessingStatus";
 import { Inspector } from "../components/layout/Inspector";
 import { ProgressBar } from "../components/ui";
 
@@ -16,7 +17,7 @@ export function Stitch() {
   const [stitching, setStitching] = useState(false);
   const [stitchProgress, setStitchProgress] = useState(0);
 
-  const clips = project?.clips?.filter((c: any) => c.include_in_stitch !== false) || [];
+  const clips: Clip[] = project?.clips?.filter((c: Clip) => c.include_in_stitch !== false) || [];
 
   const handleStitch = async () => {
     if (!projectId) return;
@@ -36,12 +37,14 @@ export function Stitch() {
     }, 300);
   };
 
-  const totalDuration = clips.reduce((acc: number, c: any) => {
-    const [hs, ms] = c.start.split(":");
-    const [he, me] = c.end.split(":");
-    const s = parseInt(hs) * 3600 + parseInt(ms) * 60 + parseFloat(he);
-    const e = parseInt(he) * 3600 + parseInt(me) * 60 + parseFloat(me);
-    return acc + (e - s);
+  const totalDuration = clips.reduce((acc: number, c: Clip) => {
+    const parts = c.start.split(":");
+    const [hs, ms, ss] = parts;
+    const start = parseInt(hs) * 3600 + parseInt(ms) * 60 + parseFloat(ss);
+    const endParts = c.end.split(":");
+    const [he, me, se] = endParts;
+    const end = parseInt(he) * 3600 + parseInt(me) * 60 + parseFloat(se);
+    return acc + (end - start);
   }, 0);
 
   const formatDuration = (seconds: number) => {
@@ -77,7 +80,7 @@ export function Stitch() {
             progress: stitchProgress,
             current: Math.floor(stitchProgress / 5),
             total: clips.length,
-            items: clips.map((c: any, i: number) => ({
+            items: clips.map((c: Clip, i: number) => ({
               id: c.id,
               name: c.title,
               status: i < Math.floor(stitchProgress / 5) ? "completed" : i === Math.floor(stitchProgress / 5) ? "processing" : "waiting",
@@ -92,7 +95,7 @@ export function Stitch() {
         {/* Timeline */}
         <div className="col-span-2">
           <Timeline
-            scenes={clips}
+            scenes={clips as unknown as Scene[]}
             selectedIndex={null}
             onSelect={(i) => {
               if (clips[i]) setSelectedClip(clips[i].id);

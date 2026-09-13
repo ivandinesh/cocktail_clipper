@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { LayoutDashboard, FolderOpen, Film, Scissors, Layers, Download, Settings, ChevronDown } from "lucide-react";
 
 interface SidebarProps {
