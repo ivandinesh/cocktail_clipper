@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import "./index.css";
 import { ClipsTable } from "./ClipsTable";
 
@@ -17,6 +17,8 @@ interface DashboardProps {
   projectId: string | null;
   projectName: string;
   onBackToCreate: () => void;
+  onProjectIdChange: (id: string | null) => void;
+  onProjectNameChange: (name: string) => void;
   onRecut: (clipId: string) => void;
   onRestitch: (clipId: string) => void;
   onEditHook: (clipId: string, hook: string) => void;
@@ -28,6 +30,8 @@ function Dashboard({
   projectId,
   projectName,
   onBackToCreate,
+  onProjectIdChange,
+  onProjectNameChange,
   onRecut,
   onRestitch,
   onEditHook,
@@ -38,47 +42,45 @@ function Dashboard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch project data when component mounts or projectId changes
-  useEffect(() => {
+  const fetchProjectData = useCallback(async () => {
     if (!projectId) {
       setClips([]);
       return;
     }
 
     setLoading(true);
+    try {
+      const response = await fetch(`http://localhost:8000/projects/${projectId}`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "Failed to fetch project");
+      }
+      const data = await response.json();
+      const projectClips: ProjectClip[] = (data.clips || []).map(
+        (clip: any) => ({
+          id: clip.id || "unknown",
+          start: clip.start || "00:00:00.000",
+          end: clip.end || "00:00:00.000",
+          title: clip.title || "Untitled",
+          status: clip.status || "planned",
+          clip_file: clip.clip_file || null,
+          final_file: clip.final_file || null,
+          transcript: clip.transcript || "",
+        })
+      );
+      setClips(projectClips);
+      onProjectNameChange(data.project?.name || projectName);
+    } catch (err: any) {
+      setError(err.message || "Failed to load project");
+      setClips([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, onProjectNameChange, projectName]);
 
-    fetch(`http://localhost:8000/projects/${projectId}`)
-      .then((res) => {
-        if (!res.ok) {
-          return res.json().then((err) => {
-            throw new Error(err.detail || "Failed to fetch project");
-          });
-        }
-        return res.json();
-      })
-      .then((data) => {
-        // Transform project.clips into ProjectClip format
-        const projectClips: ProjectClip[] = (data.clips || []).map(
-          (clip: any) => ({
-            id: clip.id || "unknown",
-            start: clip.start || "00:00:00.000",
-            end: clip.end || "00:00:00.000",
-            title: clip.title || "Untitled",
-            status: clip.status || "planned",
-            clip_file: clip.clip_file || null,
-            final_file: clip.final_file || null,
-            transcript: clip.transcript || "",
-          })
-        );
-        setClips(projectClips);
-        setProjectName(data.project?.name || projectName);
-      })
-      .catch((err: any) => {
-        setError(err.message || "Failed to load project");
-        setClips([]);
-      })
-      .finally(() => setLoading(false));
-  }, [projectId]);
+  useEffect(() => {
+    if (projectId) fetchProjectData();
+  }, [projectId, fetchProjectData]);
 
   const handleRecut = (clipId: string) => {
     onRecut(clipId);
@@ -100,6 +102,11 @@ function Dashboard({
     onEditTranscript(clipId, transcript);
   };
 
+  const handleCreateNewProject = () => {
+    const newId = "proj-" + Math.random().toString(36).substr(2, 9);
+    onProjectIdChange(newId);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -118,8 +125,10 @@ function Dashboard({
           <p>{error}</p>
           <hr />
           <button
-            onClick={() => fetchProjectData()}
-            className="btn btn-primary w-full">Retry
+            onClick={fetchProjectData}
+            className="btn btn-primary w-full"
+          >
+            Retry
           </button>
         </div>
       </div>
@@ -133,7 +142,7 @@ function Dashboard({
           <h2 className="text-2xl font-bold mb-4">Project Dashboard</h2>
           <p>No project selected</p>
           <button
-            onClick={() => setProjectId(generateMockId())}
+            onClick={handleCreateNewProject}
             className="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500"
           >
             Create or Select Project
@@ -150,7 +159,7 @@ function Dashboard({
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">Dashboard</h1>
             <button
-              onClick={() => setProjectId(null)}
+              onClick={onBackToCreate}
               className="text-sm text-gray-400 hover underline"
             >
               New Project
@@ -196,7 +205,7 @@ function Dashboard({
             <div className="p-6 text-gray-400">
               <p>No clips yet. Use the clip cutter to create clips from your source video.</p>
               <button
-                onClick={() => cutSampleClip()}
+                onClick={handleCreateNewProject}
                 className="mt-3 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500"
               >
                 Cut Sample Clip
@@ -216,17 +225,6 @@ function Dashboard({
       </main>
     </div>
   );
-}
-
-// Helper function to generate a mock project ID for demo purposes
-function generateMockId(): string {
-  return "proj-" + Math.random().toString(36).substr(2, 9);
-}
-
-// Helper function to simulate cutting a sample clip
-function cutSampleClip() {
-  // In a real app, this would call the backend API
-  alert("Sample clip cutting would be implemented here");
 }
 
 export { Dashboard };

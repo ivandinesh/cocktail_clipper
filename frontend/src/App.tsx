@@ -1,45 +1,16 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import "./index.css";
-import { ClipsTable } from "./ClipsTable";
 import { Dashboard } from "./Dashboard";
 
 function App() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
-  const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
-  const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"create" | "dashboard">("create");
-
-  // Fetch project data when projectId changes
-  useEffect(() => {
-    if (projectId) {
-      fetch(`http://localhost:8000/projects/${projectId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          // Project loaded successfully
-        })
-        .catch((err) => {
-          console.error("Failed to fetch project:", err);
-        });
-    }
-  }, [projectId]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus("uploading");
-    setError(null);
-
-    const formData = new FormData();
-    // Note: In a real app, we'd get these from file inputs
-    // For now, we'll use the dashboard data
-
-    setStatus("success");
-    setProjectId(generateMockProjectId());
+    setProjectId("proj-" + Math.random().toString(36).substr(2, 9));
     setView("dashboard");
-  };
-
-  const generateMockProjectId = (): string => {
-    return "proj-" + Math.random().toString(36).substr(2, 9);
   };
 
   const handleRecut = (clipId: string) => {
@@ -53,7 +24,6 @@ function App() {
   const handleEditHook = (clipId: string, hook: string) => {
     const newHook = prompt("Enter new hook text:", hook);
     if (newHook) {
-      // Would call backend API to update hook
       alert(`Hook updated for clip ${clipId}`);
     }
   };
@@ -61,7 +31,6 @@ function App() {
   const handleEditTitle = (clipId: string, title: string) => {
     const newTitle = prompt("Enter new title:", title);
     if (newTitle) {
-      // Would call backend API to update title
       alert(`Title updated for clip ${clipId}`);
     }
   };
@@ -69,7 +38,6 @@ function App() {
   const handleEditTranscript = (clipId: string, transcript: string) => {
     const newTranscript = prompt("Enter new transcript:", transcript);
     if (newTranscript) {
-      // Would call backend API to update transcript
       alert(`Transcript updated for clip ${clipId}`);
     }
   };
@@ -164,19 +132,9 @@ function App() {
 
               <button
                 type="submit"
-                disabled={status !== "idle"}
-                className={`w-full py-2 px-4 rounded transition-colors ${
-                  status === "idle"
-                    ? "bg-blue-600 hover:bg-blue-500 text-white"
-                    : "opacity-50 cursor-not-allowed text-gray-400"
-}`}
+                className="w-full py-2 px-4 rounded bg-blue-600 hover:bg-blue-500 text-white"
               >
-                {status === "idle"
-                  ? "Create Project"
-                  : status === "uploading"
-                  ? "Creating..."
-                  : status === "success"
-                  ? "Project Created!" : "Error"}
+                Create Project
               </button>
             </form>
           </section>
@@ -187,6 +145,11 @@ function App() {
             projectId={projectId}
             projectName={projectName}
             onBackToCreate={() => setView("create")}
+            onProjectIdChange={(id) => {
+              setProjectId(id);
+              if (!id) setView("create");
+            }}
+            onProjectNameChange={setProjectName}
             onRecut={handleRecut}
             onRestitch={handleRestitch}
             onEditHook={handleEditHook}

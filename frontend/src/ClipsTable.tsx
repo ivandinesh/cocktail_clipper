@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import "./index.css";
 
 interface Clip {
@@ -53,7 +53,6 @@ interface UseClipsTableReturn {
   clips: Clip[];
   loading: boolean;
   error: string | null;
-  refreshClips: () => void;
 }
 
 function useClipsTable(projectId: string | null): UseClipsTableReturn {
@@ -61,16 +60,7 @@ function useClipsTable(projectId: string | null): UseClipsTableReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!projectId) {
-      setClips([]);
-      return;
-    }
-
-    fetchClips();
-  }, [projectId]);
-
-  const fetchClips = async () => {
+  const fetchClips = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -111,13 +101,17 @@ function useClipsTable(projectId: string | null): UseClipsTableReturn {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
-  const refreshClips = () => {
+  useEffect(() => {
+    if (!projectId) {
+      setClips([]);
+      return;
+    }
     fetchClips();
-  };
+  }, [projectId, fetchClips]);
 
-  return { clips, loading, error, refreshClips };
+  return { clips, loading, error };
 }
 
 function ClipsTable({
@@ -128,7 +122,7 @@ function ClipsTable({
   onEditTitle,
   onEditTranscript,
 }: ClipsTableProps) {
-  const { clips, loading, error, refreshClips } = useClipsTable(projectId);
+  const { clips, loading, error } = useClipsTable(projectId);
 
   if (loading) {
     return (
