@@ -156,7 +156,7 @@ pip install -r requirements.txt
 ```
 fastapi>=0.100.0
 uvicorn[standard]>=0.27.0
-pysubs2>=5.0.0
+pysubs2>=1.0.0
 ffmpeg-python>=0.2.0
 python-multipart>=0.0.6
 ```
