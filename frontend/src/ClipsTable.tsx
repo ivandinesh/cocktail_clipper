@@ -22,16 +22,16 @@ interface ClipsTableProps {
   onEditTitle: (clipId: string, title: string) => void;
 }
 
-function getClipStatusClass(status: string): string {
+function getStatusClass(status: string): string {
   switch (status) {
-    case "planned": return "bg-yellow-600/20 text-yellow-400 border border-yellow-600/30";
-    case "cut": return "bg-orange-600/20 text-orange-400 border border-orange-600/30";
-    case "completed": return "bg-green-600/20 text-green-400 border border-green-600/30";
-    default: return "bg-gray-600/20 text-gray-400 border border-gray-600/30";
+    case "planned": return "status-planned";
+    case "cut": return "status-cut";
+    case "completed": return "status-completed";
+    default: return "status-planned";
   }
 }
 
-function getClipStatusText(status: string): string {
+function getStatusText(status: string): string {
   switch (status) {
     case "planned": return "Planned";
     case "cut": return "Cut";
@@ -83,73 +83,70 @@ export default function ClipsTable({ projectId, onRecut, onRestitch, onEditHook,
   };
 
   if (loading) {
-    return <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-400" /></div>;
+    return <div className="flex justify-center py-20"><div className="spinner" /></div>;
   }
 
   if (error) {
-    return <div className="p-6 text-center text-red-400">{error}</div>;
+    return <div className="alert-error text-center">{error}</div>;
   }
 
   if (!projectId) {
-    return <div className="p-6 text-gray-400 text-center">Select a project to view clips</div>;
+    return <div className="text-center py-20 text-zinc-500">Select a project to view clips</div>;
   }
 
   if (clips.length === 0) {
     return (
-      <div className="text-center py-16">
-        <div className="text-5xl mb-4">✂️</div>
-        <h3 className="text-xl font-semibold text-gray-300 mb-2">No clips yet</h3>
-        <p className="text-gray-500 mb-4">Cut clips from your source video to see them here.</p>
-        <a href="/cut" className="px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg text-sm text-white transition-colors">
-          Go to Cut →
-        </a>
+      <div className="page-card text-center py-16">
+        <div className="text-6xl mb-4">✂️</div>
+        <h3 className="text-xl font-semibold text-zinc-300 mb-2">No clips yet</h3>
+        <p className="text-zinc-500 mb-6">Cut clips from your source video to see them here.</p>
+        <a href="/cut" className="btn-primary inline-block">Go to Cut →</a>
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Header */}
+    <div className="animate-fade-in-up">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">Clips ({clips.length})</h2>
-        <span className="text-sm text-gray-500">Click ↓ to download, use buttons to manage</span>
+        <span className="text-xs text-zinc-600">↓ Download · Buttons to manage</span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-800">
+      <div className="table-container glass">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-800 bg-gray-900/50">
-              <th className="text-left text-gray-400 px-4 py-3 font-medium text-xs uppercase tracking-wider">ID</th>
-              <th className="text-left text-gray-400 px-4 py-3 font-medium text-xs uppercase tracking-wider">Start</th>
-              <th className="text-left text-gray-400 px-4 py-3 font-medium text-xs uppercase tracking-wider">End</th>
-              <th className="text-left text-gray-400 px-4 py-3 font-medium text-xs uppercase tracking-wider">Title</th>
-              <th className="text-left text-gray-400 px-4 py-3 font-medium text-xs uppercase tracking-wider">Status</th>
-              <th className="text-left text-gray-400 px-4 py-3 font-medium text-xs uppercase tracking-wider">Clip File</th>
-              <th className="text-left text-gray-400 px-4 py-3 font-medium text-xs uppercase tracking-wider">Final</th>
-              <th className="text-left text-gray-400 px-4 py-3 font-medium text-xs uppercase tracking-wider">Actions</th>
+            <tr className="table-header">
+              <th className="text-left text-zinc-500 px-5 py-4 font-medium text-xs uppercase tracking-wider">ID</th>
+              <th className="text-left text-zinc-500 px-5 py-4 font-medium text-xs uppercase tracking-wider">Start</th>
+              <th className="text-left text-zinc-500 px-5 py-4 font-medium text-xs uppercase tracking-wider">End</th>
+              <th className="text-left text-zinc-500 px-5 py-4 font-medium text-xs uppercase tracking-wider">Title</th>
+              <th className="text-left text-zinc-500 px-5 py-4 font-medium text-xs uppercase tracking-wider">Status</th>
+              <th className="text-left text-zinc-500 px-5 py-4 font-medium text-xs uppercase tracking-wider">Clip File</th>
+              <th className="text-left text-zinc-500 px-5 py-4 font-medium text-xs uppercase tracking-wider">Final</th>
+              <th className="text-left text-zinc-500 px-5 py-4 font-medium text-xs uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody>
             {clips.map((clip) => (
-              <tr key={clip.id} className="border-b border-gray-800/50 hover:bg-gray-900/80 transition-colors">
-                <td className="px-4 py-3 font-mono text-xs text-blue-400">{clip.id}</td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-400">{clip.start}</td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-400">{clip.end}</td>
-                <td className="px-4 py-3 text-gray-300 max-w-[150px] truncate">{clip.title}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2.5 py-1 text-xs rounded-full border ${getClipStatusClass(clip.status)}`}>
-                    {getClipStatusText(clip.status)}
+              <tr key={clip.id} className="table-row">
+                <td className="px-5 py-4 font-mono text-xs text-blue-400">{clip.id}</td>
+                <td className="px-5 py-4 font-mono text-xs text-zinc-500">{clip.start}</td>
+                <td className="px-5 py-4 font-mono text-xs text-zinc-500">{clip.end}</td>
+                <td className="px-5 py-4 text-zinc-300 max-w-[160px] truncate">{clip.title}</td>
+                <td className="px-5 py-4">
+                  <span className={`status-badge ${getStatusClass(clip.status)}`}>
+                    {getStatusText(clip.status)}
                   </span>
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-500 max-w-[120px] truncate">{clip.clip_file || "—"}</td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-500 max-w-[120px] truncate">{clip.final_file || "—"}</td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-1.5 flex-wrap">
+                <td className="px-5 py-4 font-mono text-xs text-zinc-600 max-w-[120px] truncate">{clip.clip_file || "—"}</td>
+                <td className="px-5 py-4 font-mono text-xs text-zinc-600 max-w-[120px] truncate">{clip.final_file || "—"}</td>
+                <td className="px-5 py-4">
+                  <div className="flex gap-2 flex-wrap">
                     {clip.clip_file && (
                       <button
                         onClick={() => handleDownload(clip)}
-                        className="px-2.5 py-1 bg-blue-600/80 hover:bg-blue-500 rounded text-xs text-white transition-colors"
-                        title="Download clip"
+                        className="px-3 py-1.5 bg-blue-600/80 hover:bg-blue-500 rounded-lg text-xs text-white transition-colors"
+                        title="Download"
                       >
                         ↓
                       </button>
@@ -157,8 +154,7 @@ export default function ClipsTable({ projectId, onRecut, onRestitch, onEditHook,
                     {clip.status === "cut" && (
                       <button
                         onClick={() => onRecut(clip.id)}
-                        className="px-2.5 py-1 bg-orange-600/80 hover:bg-orange-500 rounded text-xs text-white transition-colors"
-                        title="Recut with new timestamps"
+                        className="px-3 py-1.5 bg-orange-600/80 hover:bg-orange-500 rounded-lg text-xs text-white transition-colors"
                       >
                         Recut
                       </button>
@@ -166,23 +162,20 @@ export default function ClipsTable({ projectId, onRecut, onRestitch, onEditHook,
                     {clip.final_file && (
                       <button
                         onClick={() => onRestitch(clip.id)}
-                        className="px-2.5 py-1 bg-green-600/80 hover:bg-green-500 rounded text-xs text-white transition-colors"
-                        title="Restitch with branding"
+                        className="px-3 py-1.5 bg-green-600/80 hover:bg-green-500 rounded-lg text-xs text-white transition-colors"
                       >
                         Restitch
                       </button>
                     )}
                     <button
                       onClick={() => onEditHook(clip.id, clip.hook)}
-                      className="px-2.5 py-1 bg-purple-600/80 hover:bg-purple-500 rounded text-xs text-white transition-colors"
-                      title="Edit hook"
+                      className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-500 rounded-lg text-xs text-white transition-colors"
                     >
                       Hook
                     </button>
                     <button
                       onClick={() => onEditTitle(clip.id, clip.title)}
-                      className="px-2.5 py-1 bg-blue-600/80 hover:bg-blue-500 rounded text-xs text-white transition-colors"
-                      title="Edit title"
+                      className="px-3 py-1.5 bg-blue-600/80 hover:bg-blue-500 rounded-lg text-xs text-white transition-colors"
                     >
                       Title
                     </button>

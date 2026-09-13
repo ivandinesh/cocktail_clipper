@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import "./index.css";
 
 export default function ImportScenes() {
   const [searchParams] = useSearchParams();
@@ -32,40 +33,41 @@ export default function ImportScenes() {
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="animate-fade-in-up">
       {/* Hero */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-2xl">
-            📥
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold">Import AI Scenes</h1>
-            <p className="text-gray-400 text-sm">Upload AI-generated clip timestamps to auto-populate your project</p>
-          </div>
-        </div>
+      <div className="text-center mb-10">
+        <div className="hero-icon" style={{ width: 80, height: 80, fontSize: 36 }}>📥</div>
+        <h1 className="text-4xl font-bold mb-2 tracking-tight">Import AI Scenes</h1>
+        <p className="text-zinc-500 text-lg">Upload AI-generated clip timestamps to auto-populate your project</p>
       </div>
 
       {/* How it works */}
-      <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-5 mb-6 space-y-2">
-        <h3 className="text-sm font-semibold text-gray-300 mb-2">💡 How to use</h3>
-        <p className="text-sm text-gray-400 mb-2">
-          If you have an AI tool that generates scene timestamps, export them as JSON and upload here.
-        </p>
-        <p className="text-xs text-gray-500">
-          Expected JSON format: <code className="text-blue-400">{"{ clips: [{ start, end, title, hook, next_hook }] }"}</code>
+      <div className="page-card mb-8">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-3">💡 How to use</h3>
+        <div className="space-y-2">
+          <div className="step-card">
+            <div className="step-number bg-blue-600/20 text-blue-400">1</div>
+            <div className="text-sm text-zinc-400">Export scene timestamps from your AI tool as JSON</div>
+          </div>
+          <div className="step-card">
+            <div className="step-number bg-blue-600/20 text-blue-400">2</div>
+            <div className="text-sm text-zinc-400">Upload the JSON file here</div>
+          </div>
+          <div className="step-card">
+            <div className="step-number bg-green-600/20 text-green-400">3</div>
+            <div className="text-sm text-zinc-400">Clips are automatically added to your project</div>
+          </div>
+        </div>
+        <p className="text-xs text-zinc-600 mt-4">
+          Expected format: <span className="code-text">{"{ clips: [{ start, end, title, hook, next_hook }] }"}</span>
         </p>
       </div>
 
-      <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 space-y-6">
+      <div className="page-card space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Upload AI-generated JSON
-          </label>
+          <label className="block text-sm font-medium text-zinc-400 mb-3">Upload AI-generated JSON</label>
           <div
-            className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-all hover:border-blue-500 hover:bg-gray-900/50 ${
-              file ? "border-green-500/50 bg-green-900/10" : "border-gray-700"
-            }`}
+            className={`drop-zone ${file ? "has-file" : ""}`}
             onClick={() => document.getElementById("sceneFile")?.click()}
           >
             <input
@@ -83,8 +85,8 @@ export default function ImportScenes() {
                 </div>
               ) : (
                 <div>
-                  <div className="text-gray-500 text-3xl mb-2">📄</div>
-                  <span className="text-gray-400">Click to upload JSON</span>
+                  <div className="text-4xl mb-3">📄</div>
+                  <span className="text-zinc-500">Click to upload JSON</span>
                 </div>
               )}
             </div>
@@ -94,17 +96,13 @@ export default function ImportScenes() {
         <button
           onClick={handleImport}
           disabled={loading || !file || !projectId}
-          className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:opacity-50 rounded-lg font-semibold text-white transition-all shadow-lg shadow-blue-600/20"
+          className="btn-primary w-full"
         >
           {loading ? "Importing..." : "📥 Import Scenes"}
         </button>
 
         {result && (
-          <div className={`p-4 rounded-lg text-sm flex items-center gap-2 ${
-            result.startsWith("✓")
-              ? "bg-green-900/30 text-green-400 border border-green-700/30"
-              : "bg-red-900/30 text-red-400 border border-red-700/30"
-          }`}>
+          <div className={`flex items-center gap-2 ${result.startsWith("✓") ? "alert-success" : "alert-error"}`}>
             {result}
           </div>
         )}

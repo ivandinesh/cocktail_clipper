@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import "./index.css";
 
 interface Branding {
   channel: string;
@@ -49,73 +50,77 @@ export default function BrandingSettings() {
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="animate-fade-in-up">
       {/* Hero */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-2xl">
-            🎨
+      <div className="text-center mb-10">
+        <div className="hero-icon" style={{ width: 80, height: 80, fontSize: 36 }}>🎨</div>
+        <h1 className="text-4xl font-bold mb-2 tracking-tight">Branding Settings</h1>
+        <p className="text-zinc-500 text-lg">Customize your channel identity and video branding</p>
+      </div>
+
+      {/* How it works */}
+      <div className="page-card mb-8">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-4">💡 How branding works</h3>
+        <div className="space-y-3">
+          <div className="step-card">
+            <div className="step-number bg-blue-600/20 text-blue-400">1</div>
+            <div className="text-sm text-zinc-400">Channel name appears on intro cards and overlays</div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold">Branding Settings</h1>
-            <p className="text-gray-400 text-sm">Customize your channel identity and video branding</p>
+          <div className="step-card">
+            <div className="step-number bg-purple-600/20 text-purple-400">2</div>
+            <div className="text-sm text-zinc-400">Intro/outro durations control card display time</div>
+          </div>
+          <div className="step-card">
+            <div className="step-number bg-green-600/20 text-green-400">3</div>
+            <div className="text-sm text-zinc-400">Outro text displays at the end of each stitched video</div>
           </div>
         </div>
       </div>
 
-      {/* How it works */}
-      <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-5 mb-6 space-y-2">
-        <h3 className="text-sm font-semibold text-gray-300 mb-2">💡 How branding works</h3>
-        <p className="text-sm text-gray-400">
-          Your channel name appears on intro cards. Intro/outro durations control how long each card stays on screen.
-          The outro text displays at the end of each stitched video.
-        </p>
-      </div>
-
-      <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 space-y-6">
+      <div className="page-card space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Channel Name</label>
-          <p className="text-xs text-gray-500 mb-2">This name appears on your intro cards and overlays</p>
+          <label className="block text-sm font-medium text-zinc-400 mb-2">Channel Name</label>
+          <p className="text-xs text-zinc-600 mb-3">Appears on intro cards and video overlays</p>
           <input
             type="text"
             value={branding.channel}
             onChange={(e) => setBranding({ ...branding, channel: e.target.value })}
-            className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30 outline-none transition-all"
+            className="input-field"
             placeholder="e.g., CocktailClips"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Intro Duration (seconds)</label>
-            <p className="text-xs text-gray-500 mb-2">How long the intro card shows before the clip</p>
+            <label className="block text-sm font-medium text-zinc-400 mb-2">Intro Duration (s)</label>
+            <p className="text-xs text-zinc-600 mb-3">How long the intro card shows</p>
             <input
               type="number"
               value={branding.intro_duration}
               onChange={(e) => setBranding({ ...branding, intro_duration: Number(e.target.value) })}
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-purple-500 outline-none"
+              className="input-field"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Outro Duration (seconds)</label>
-            <p className="text-xs text-gray-500 mb-2">How long the outro card shows after the clip</p>
+            <label className="block text-sm font-medium text-zinc-400 mb-2">Outro Duration (s)</label>
+            <p className="text-xs text-zinc-600 mb-3">How long the outro card shows</p>
             <input
               type="number"
               value={branding.outro_duration}
               onChange={(e) => setBranding({ ...branding, outro_duration: Number(e.target.value) })}
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-purple-500 outline-none"
+              className="input-field"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Outro Text</label>
-          <p className="text-xs text-gray-500 mb-2">Text displayed on the outro card (e.g., "Follow for Part 2")</p>
+          <label className="block text-sm font-medium text-zinc-400 mb-2">Outro Text</label>
+          <p className="text-xs text-zinc-600 mb-3">Displayed on the outro card</p>
           <input
             type="text"
             value={branding.outro_text}
             onChange={(e) => setBranding({ ...branding, outro_text: e.target.value })}
-            className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:border-purple-500 outline-none transition-all"
+            className="input-field"
             placeholder="e.g., Follow for Part 2"
           />
         </div>
@@ -123,7 +128,7 @@ export default function BrandingSettings() {
         <button
           onClick={handleSave}
           disabled={loading}
-          className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 disabled:opacity-50 rounded-lg font-semibold text-white transition-all shadow-lg shadow-purple-600/20"
+          className="btn-purple w-full"
         >
           {loading ? "Saving..." : saved ? "✓ Saved!" : "Save Branding"}
         </button>
