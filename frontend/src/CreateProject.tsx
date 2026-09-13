@@ -12,6 +12,7 @@ export default function CreateProject() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(false);
     setLoading(true);
 
     if (!videoFile || !srtFile) {
@@ -48,13 +49,38 @@ export default function CreateProject() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            <span className="text-blue-400">Cocktail</span>Clips
+        {/* Hero Section */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600/20 border border-blue-500/30 mb-6">
+            <span className="text-3xl">🎬</span>
+          </div>
+          <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            CocktailClips
           </h1>
-          <p className="text-gray-400 text-sm">Create a new project from your video and subtitles</p>
+          <p className="text-gray-400 text-lg leading-relaxed">
+            Create short-form video clips from your long videos and subtitles.
+            Upload your MP4 and SRT files, and we'll handle the rest.
+          </p>
         </div>
 
+        {/* How it works */}
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-5 mb-8 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-300 mb-2">How it works</h3>
+          <div className="flex items-center gap-3 text-sm text-gray-400">
+            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center text-xs font-bold">1</span>
+            <span>Upload your video (MP4) and subtitles (SRT)</span>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-gray-400">
+            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center text-xs font-bold">2</span>
+            <span>Cut clips from your video using timestamps</span>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-gray-400">
+            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center text-xs font-bold">3</span>
+            <span>Stitch with branding and download final videos</span>
+          </div>
+        </div>
+
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -66,7 +92,7 @@ export default function CreateProject() {
               onChange={(e) => setProjectName(e.target.value)}
               placeholder="e.g., Episode 12 - AI Podcast"
               required
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none transition-all"
             />
           </div>
 
@@ -75,7 +101,9 @@ export default function CreateProject() {
               Video File (MP4)
             </label>
             <div
-              className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-900/50 transition-colors"
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all hover:border-blue-500 hover:bg-gray-900/50 ${
+                videoFile ? "border-green-500/50 bg-green-900/10" : "border-gray-700"
+              }`}
               onClick={() => document.getElementById("videoFile")?.click()}
             >
               <input
@@ -85,11 +113,17 @@ export default function CreateProject() {
                 className="hidden"
                 onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
               />
-              <div className="text-gray-400 text-sm">
+              <div className="text-sm">
                 {videoFile ? (
-                  <span className="text-green-400">{videoFile.name}</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-green-400">✓</span>
+                    <span className="text-green-400 font-medium">{videoFile.name}</span>
+                  </div>
                 ) : (
-                  <span>Click to upload MP4</span>
+                  <div>
+                    <div className="text-gray-500 text-2xl mb-1">📁</div>
+                    <span className="text-gray-400">Click to upload MP4</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -100,7 +134,9 @@ export default function CreateProject() {
               Subtitle File (SRT)
             </label>
             <div
-              className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-900/50 transition-colors"
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all hover:border-blue-500 hover:bg-gray-900/50 ${
+                srtFile ? "border-green-500/50 bg-green-900/10" : "border-gray-700"
+              }`}
               onClick={() => document.getElementById("srtFile")?.click()}
             >
               <input
@@ -110,28 +146,40 @@ export default function CreateProject() {
                 className="hidden"
                 onChange={(e) => setSrtFile(e.target.files?.[0] || null)}
               />
-              <div className="text-gray-400 text-sm">
+              <div className="text-sm">
                 {srtFile ? (
-                  <span className="text-green-400">{srtFile.name}</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-green-400">✓</span>
+                    <span className="text-green-400 font-medium">{srtFile.name}</span>
+                  </div>
                 ) : (
-                  <span>Click to upload SRT</span>
+                  <div>
+                    <div className="text-gray-500 text-2xl mb-1">📝</div>
+                    <span className="text-gray-400">Click to upload SRT</span>
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
           {error && (
-            <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 text-red-400 text-sm">
-              {error}
+            <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3 text-red-400 text-sm flex items-center gap-2">
+              <span>⚠</span> {error}
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium text-white transition-colors"
+            className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-all shadow-lg shadow-blue-600/20"
           >
-            {loading ? "Creating..." : "Create Project"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin">⏳</span> Creating...
+              </span>
+            ) : (
+              "🚀 Create Project"
+            )}
           </button>
         </form>
       </div>

@@ -39,3 +39,69 @@ body {
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+/* Gradient text utility */
+.bg-gradient-text {
+  background: linear-gradient(to right, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Button glow effects */
+.btn-glow-blue {
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+.btn-glow-blue:hover {
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.btn-glow-green {
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+.btn-glow-green:hover {
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+}
+
+.btn-glow-orange {
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+}
+.btn-glow-orange:hover {
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+}
+
+.btn-glow-purple {
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+}
+.btn-glow-purple:hover {
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4);
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Status pulse */
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.status-pulse {
+  animation: pulse-green 2s ease-in-out infinite;
+}
