@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
+import { Routes, Route, NavLink } from "react-router-dom";
 import "./index.css";
 import Dashboard from "./Dashboard";
 import BrandingSettings from "./BrandingSettings";
@@ -9,8 +9,7 @@ import CreateProject from "./CreateProject";
 
 function App() {
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-950 text-white">
         <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50">
           <nav className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
             <NavLink to="/" className="text-xl font-bold tracking-tight">
@@ -105,7 +104,6 @@ function App() {
           </Routes>
         </main>
       </div>
-    </BrowserRouter>
   );
 }
 
