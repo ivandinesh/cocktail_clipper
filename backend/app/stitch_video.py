@@ -167,11 +167,11 @@ def stitch_video(
         filter_parts = []
 
         for i in range(num_inputs):
-            filter_parts.append(f"[{i}:v]:v")
-            filter_parts.append(f"[{i}:a]:a")
+            filter_parts.append(f"[{i}:v]")
+            filter_parts.append(f"[{i}:a]")
 
         filter_string = "".join(filter_parts)
-        filter_string += f"concat={num_inputs}:v:a[out_v][out_a]"
+        filter_string += f"concat={num_inputs}:v=1:a=1[out_v][out_a]"
 
         update_progress(4, "Finalizing output video...")
 
@@ -203,7 +203,7 @@ def stitch_video(
                     ffmpeg.input(output_path)
                     .output(
                         output_path,
-                        vf=f'overlay={logo_path}:x=main_w-{int(float(logo_size.split("x")[0]))}:y=main_h-{int(float(logo_size.split("x")[1]))}',
+                        vf=f"overlay={logo_path}:x=main_w-{int(float(logo_size.split('x')[0]))}:y=main_h-{int(float(logo_size.split('x')[1]))}",
                         codec="copy"
                     )
                     .overwrite_output()

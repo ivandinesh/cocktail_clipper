@@ -8,6 +8,7 @@ Provides functions to:
 - Fallback: regenerate subtitles from transcript timestamps in project.json
 """
 
+import ffmpeg
 import os
 import tempfile
 from typing import Optional, List, Dict, Any
@@ -98,7 +99,8 @@ def extract_subtitles_srt(
 def shift_subtitle_timestamps(
     ssa_file: SSAFile,
     clip_start_seconds: float
-) -> SSAFile: """Shift subtitle timestamps so they start at 0 in the clip.
+) -> SSAFile:
+    """Shift subtitle timestamps so they start at 0 in the clip.
 
     Takes an SSAFile with events that start at clip_start_seconds and
     shifts all events so the first event starts at 0.
@@ -147,7 +149,8 @@ def shift_subtitle_timestamps(
     return shifted_ssa
 
 
-def generate_ass_file(ssa_file: SSAFile, output_path: str) -> bool: """Generate an ASS subtitle file from an SSAFile.
+def generate_ass_file(ssa_file: SSAFile, output_path: str) -> bool:
+    """Generate an ASS subtitle file from an SSAFile.
 
     Args:
         ssa_file: SSAFile with subtitle events
@@ -222,7 +225,8 @@ YCbCr Matrix: 170m
         return False
 
 
-def format_ass_timestamp(seconds: float) -> str: """Convert seconds to ASS timestamp format (HH:MM:SS.cc).
+def format_ass_timestamp(seconds: float) -> str:
+    """Convert seconds to ASS timestamp format (HH:MM:SS.cc).
 
     Args:
         seconds: Time in seconds (float)
@@ -242,7 +246,8 @@ def format_ass_timestamp(seconds: float) -> str: """Convert seconds to ASS times
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{centisecs:02d}"
 
 
-def escape_ass_text(text: str) -> str: """Escape special characters for ASS subtitle text.
+def escape_ass_text(text: str) -> str:
+    """Escape special characters for ASS subtitle text.
 
     ASS has special syntax that needs escaping, particularly curly braces {}.
 
@@ -266,7 +271,8 @@ def burn_subtitles_ffmpeg(
     video_path: str,
     subtitle_ass_path: str,
     output_path: str
-) -> Optional[str]: """Burn subtitles into video using FFmpeg.
+) -> Optional[str]:
+    """Burn subtitles into video using FFmpeg.
 
     Uses FFmpeg to overlay ASS subtitles onto the video file.
     The subtitles are burned in permanently (not as a separate track).
@@ -328,7 +334,8 @@ def transcript_to_subtitles_ttml(
     transcript: str,
     start_time: str,
     end_time: str
-) -> str: """Convert transcript text to TTML subtitle format as fallback.
+) -> str:
+    """Convert transcript text to TTML subtitle format as fallback.
 
     If transcript exists in project.json and no SRT subtitles are available,
     this function generates a basic TTML subtitle from the transcript text.
@@ -375,7 +382,8 @@ def transcript_to_subtitles_ttml(
     return ttml
 
 
-def parse_timestamp_to_seconds_pysubs2(timestamp: str) -> float: """Parse timestamp string (HH:MM:SS.mmm) to seconds for pysubs2 usage.
+def parse_timestamp_to_seconds_pysubs2(timestamp: str) -> float:
+    """Parse timestamp string (HH:MM:SS.mmm) to seconds for pysubs2 usage.
 
     Args:
         timestamp: Timestamp in HH:MM:SS.mmm format

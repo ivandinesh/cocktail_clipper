@@ -8,16 +8,19 @@ FastAPI-based backend that handles:
 """
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import uvicorn
 import json
 import os
 import uuid
+import tempfile
+import ffmpeg
 from pathlib import Path
 from typing import Optional
 
 from .cut_clip import cut_clip, parse_timestamp_to_seconds, validate_timestamp_format
 from .stitch_video import stitch_video, get_video_duration, validate_video_file
+from .pysubs2_integration import extract_subtitles_srt, shift_subtitle_timestamps, generate_ass_file, burn_subtitles_ffmpeg
 
 app = FastAPI(
     title="CocktailClips Backend",
@@ -313,6 +316,20 @@ async def cut_project_clip(
             detail="Failed to cut clip using FFmpeg. Check that FFmpeg is installed and accessible."
         )
 
+    # Extract and burn subtitles if source.srt exists
+    srt_path = project_dir / "source.srt"
+    if srt_path.exists():
+        try:
+            ssa_file = extract_subtitles_srt(str(srt_path), start_time, end_time)
+            if ssa_file and len(ssa_file.events) > 0:
+                shifted_ssa = shift_subtitle_timestamps(ssa_file, parse_timestamp_to_seconds(start_time))
+                ass_path = project_dir / "clips" / f"{clip_file_name}.ass"
+                ass_path.parent.mkdir(parents=True, exist_ok=True)
+                if generate_ass_file(shifted_ssa, str(ass_path)):
+                    burn_subtitles_ffmpeg(str(clip_output_path), str(ass_path), str(clip_output_path))
+        except Exception as e:
+            print(f"Subtitle processing failed: {e}")
+
     # Update project.json with clip information
     new_clip = {
         "id": clip_title or f"clip_{clip_index}",
@@ -589,6 +606,301 @@ async def stitch_project(
             "outro_used": outro_path is not None,
             "logo_used": logo_path is not None
         }
+    )
+
+
+@app.post("/projects/{project_id}/clip/{clip_id}/recut")
+async def recut_clip(
+    project_id: str,
+    clip_id: str,
+    start_time: str = Form(...),
+    end_time: str = Form(...),
+    clip_title: str = Form(...)
+):
+    """Recut an existing clip with new timestamps.
+
+    Args:
+        project_id: UUID of the project
+        clip_id: ID of the clip to recut
+        start_time: New start timestamp in HH:MM:SS.mmm format
+        end_time: New end timestamp in HH:MM:SS.mmm format
+        clip_title: New title for the clip
+
+    Returns:
+        JSON response with recut status
+    """
+    project_dir = BASE_DIR / project_id
+    if not project_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+
+    project_json_path = project_dir / "project.json"
+    if not project_json_path.exists():
+        raise HTTPException(status_code=404, detail="project.json not found")
+
+    with open(project_json_path, "r") as f:
+        project_data = json.load(f)
+
+    # Find the clip
+    clip_index = None
+    for i, clip in enumerate(project_data["clips"]):
+        if clip.get("id") == clip_id:
+            clip_index = i
+            break
+
+    if clip_index is None:
+        raise HTTPException(status_code=404, detail=f"Clip {clip_id} not found")
+
+    # Validate timestamps
+    if not validate_timestamp_format(start_time) or not validate_timestamp_format(end_time):
+        raise HTTPException(status_code=400, detail="Invalid timestamp format. Expected HH:MM:SS.mmm")
+
+    start_seconds = parse_timestamp_to_seconds(start_time)
+    end_seconds = parse_timestamp_to_seconds(end_time)
+    if start_seconds >= end_seconds:
+        raise HTTPException(status_code=400, detail="start_time must be before end_time")
+
+    # Cut the new clip
+    clip_file_name = f"recut_{clip_id}.mp4"
+    clip_output_path = project_dir / "clips" / clip_file_name
+    clip_output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    result = cut_clip(
+        source_video=str(project_dir / "source.mp4"),
+        start_time=start_time,
+        end_time=end_time,
+        output_path=str(clip_output_path)
+    )
+
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to recut clip")
+
+    # Update clip in project.json
+    project_data["clips"][clip_index]["start"] = start_time
+    project_data["clips"][clip_index]["end"] = end_time
+    project_data["clips"][clip_index]["title"] = clip_title or project_data["clips"][clip_index]["title"]
+    project_data["clips"][clip_index]["clip_file"] = clip_file_name
+    project_data["clips"][clip_index]["status"] = "cut"
+    project_data["clips"][clip_index]["final_file"] = None
+
+    with open(project_json_path, "w") as f:
+        json.dump(project_data, f, indent=2)
+
+    return JSONResponse(content={
+        "status": "success",
+        "message": "Clip recut successfully",
+        "clip_id": clip_id,
+        "clip_file": clip_file_name
+    })
+
+
+@app.post("/projects/{project_id}/clip/{clip_id}/restitch")
+async def restitch_clip(
+    project_id: str,
+    clip_id: str,
+    logo_override: str = Form(default=None)
+):
+    """Restitch a single completed clip with branding.
+
+    Args:
+        project_id: UUID of the project
+        clip_id: ID of the clip to restitch
+        logo_override: Optional logo file path
+
+    Returns:
+        JSON response with restitch status
+    """
+    project_dir = BASE_DIR / project_id
+    if not project_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+
+    project_json_path = project_dir / "project.json"
+    if not project_json_path.exists():
+        raise HTTPException(status_code=404, detail="project.json not found")
+
+    with open(project_json_path, "r") as f:
+        project_data = json.load(f)
+
+    # Find the clip
+    clip_index = None
+    for i, clip in enumerate(project_data["clips"]):
+        if clip.get("id") == clip_id:
+            clip_index = i
+            break
+
+    if clip_index is None:
+        raise HTTPException(status_code=404, detail=f"Clip {clip_id} not found")
+
+    clip = project_data["clips"][clip_index]
+    if clip.get("status") != "cut":
+        raise HTTPException(status_code=400, detail=f"Clip {clip_id} is not cut yet")
+
+    # Get branding
+    branding = project_data.get("branding", {})
+    channel_name = branding.get("channel", "CocktailClips")
+    outro_text = branding.get("outro_text", "Follow for Part 2")
+    hook = clip.get("hook", "")
+    next_hook = clip.get("next_hook", "")
+
+    # Determine logo path
+    logo_path = None
+    assets_dir = Path("assets")
+    for lp in [assets_dir / "logo.png", assets_dir / "logo.jpg", project_dir / "logo.png"]:
+        if lp.exists():
+            logo_path = str(lp)
+            break
+    if logo_override and os.path.exists(logo_override):
+        logo_path = logo_override
+
+    # Create intro with hook text
+    intro_output = project_dir / f"intro_{clip_id}.mp4"
+    try:
+        ffmpeg.input('color=c=black:d=2', f='lavfi').output(
+            str(intro_output),
+            vf=f"drawtext=text='{hook}':fontsize=24:fontcolor=white:x=(w-text_width/2):y=(h-text_height-10)",
+            codec="libx264"
+        ).overwrite_output().run(capture_stdout=True, capture_stderr=True)
+    except Exception:
+        intro_output = None
+
+    # Create outro with next_hook text
+    outro_output = project_dir / f"outro_{clip_id}.mp4"
+    try:
+        ffmpeg.input('color=c=black:d=2', f='lavfi').output(
+            str(outro_output),
+            vf=f"drawtext=text='{next_hook}':fontsize=24:fontcolor=white:x=(w-text_width/2):y=(h-text_height-10)",
+            codec="libx264"
+        ).overwrite_output().run(capture_stdout=True, capture_stderr=True)
+    except Exception:
+        outro_output = None
+
+    # Prepare clip paths
+    clip_file = clip.get("clip_file")
+    clip_path = str(project_dir / "clips" / clip_file) if clip_file and (project_dir / "clips" / clip_file).exists() else None
+
+    if clip_path and intro_output and outro_output:
+        output_filename = f"final_{clip_id}.mp4"
+        output_path = str(project_dir / "final" / output_filename)
+
+        result = stitch_video(
+            clips=[clip_path],
+            intro_path=intro_output,
+            outro_path=outro_output,
+            output_path=output_path,
+            logo_path=logo_path,
+            logo_size="150x150"
+        )
+
+        if result is None:
+            raise HTTPException(status_code=500, detail="Failed to restitch clip")
+    elif clip_path:
+        output_filename = f"final_{clip_id}.mp4"
+        output_path = str(project_dir / "final" / output_filename)
+        import shutil
+        shutil.copy2(clip_path, output_path)
+        result = output_path
+    else:
+        raise HTTPException(status_code=400, detail="Clip file not found")
+
+    # Update clip
+    final_file_name = os.path.basename(output_path)
+    project_data["clips"][clip_index]["final_file"] = final_file_name
+    project_data["clips"][clip_index]["status"] = "completed"
+
+    with open(project_json_path, "w") as f:
+        json.dump(project_data, f, indent=2)
+
+    return JSONResponse(content={
+        "status": "success",
+        "message": "Clip restitched successfully",
+        "final_file": final_file_name,
+        "clip_id": clip_id
+    })
+
+
+@app.get("/projects/{project_id}/clips/{clip_id}/preview")
+async def preview_clip(
+    project_id: str,
+    clip_id: str
+):
+    """Get a preview video file for a clip.
+
+    Args:
+        project_id: UUID of the project
+        clip_id: ID of the clip
+
+    Returns:
+        Video file response
+    """
+    project_dir = BASE_DIR / project_id
+    if not project_dir.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    with open(project_dir / "project.json", "r") as f:
+        project_data = json.load(f)
+
+    clip = None
+    for c in project_data["clips"]:
+        if c.get("id") == clip_id:
+            clip = c
+            break
+
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+
+    clip_file = clip.get("clip_file") or clip.get("final_file")
+    if not clip_file:
+        raise HTTPException(status_code=404, detail="No preview file available")
+
+    video_path = project_dir / "clips" / clip_file
+    if not video_path.exists():
+        video_path = project_dir / "final" / clip_file
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Preview file not found")
+
+    return FileResponse(
+        str(video_path),
+        media_type="video/mp4",
+        filename=clip_file
+    )
+
+
+@app.get("/projects/{project_id}/download")
+async def download_final_video(
+    project_id: str
+):
+    """Download the final stitched video for a project.
+
+    Args:
+        project_id: UUID of the project
+
+    Returns:
+        Video file response
+    """
+    project_dir = BASE_DIR / project_id
+    if not project_dir.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    with open(project_dir / "project.json", "r") as f:
+        project_data = json.load(f)
+
+    # Find the first completed clip's final file
+    final_file = None
+    for clip in project_data["clips"]:
+        if clip.get("final_file"):
+            final_file = clip["final_file"]
+            break
+
+    if not final_file:
+        raise HTTPException(status_code=404, detail="No final video available")
+
+    video_path = project_dir / "final" / final_file
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Final video file not found")
+
+    return FileResponse(
+        str(video_path),
+        media_type="video/mp4",
+        filename=final_file
     )
 
 
