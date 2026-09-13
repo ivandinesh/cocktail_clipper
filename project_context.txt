@@ -1,0 +1,300 @@
+# CocktailClips — Local AI Video Clipper (React + FastAPI + FFmpeg)
+
+Build a complete local application called **CocktailClips** that automatically cuts and prepares short-form videos from a source video and transcript (SRT).
+
+## Tech Stack
+
+* Frontend: React + Vite + Tailwind CSS.
+* Backend: FastAPI (Python 3.11+).
+* Video processing: FFmpeg.
+* Subtitle processing: pysubs2.
+* No cloud services. Everything runs locally.
+* Backend exposes REST APIs used by the frontend.
+
+## Core Architecture
+
+The application uses **one master project JSON** as the single source of truth.
+
+Every tool updates this JSON instead of creating separate metadata files.
+
+Project structure:
+
+```text
+cocktailclips/
+├── frontend/
+├── backend/
+├── projects/
+│   └── my-project/
+│       ├── source.mp4
+│       ├── source.srt
+│       ├── project.json
+│       ├── clips/
+│       └── final/
+├── assets/
+│   ├── logo.png
+│   ├── intro.png
+│   └── outro.png
+```
+
+## Master project.json
+
+```json
+{
+  "project": {
+    "id": "podcast-001",
+    "name": "Episode 12 - AI Podcast"
+  },
+  "source": {
+    "video": "source.mp4",
+    "subtitle": "source.srt"
+  },
+  "branding": {
+    "channel": "CocktailClips",
+    "intro_duration": 2,
+    "outro_duration": 2,
+    "outro_text": "Follow for Part 2"
+  },
+  "clips": [
+    {
+      "id": "001",
+      "start": "00:02:13.500",
+      "end": "00:02:42.800",
+      "title": "He accidentally revealed the secret.",
+      "hook": "You won't believe what he admitted...",
+      "next_hook": "Part 2 explains why this happened.",
+      "transcript": "Transcript for only this clip.",
+      "clip_file": null,
+      "final_file": null,
+      "status": "planned"
+    }
+  ]
+}
+```
+
+This JSON is edited by the UI and backend.
+
+---
+
+## Feature 1 — Project Creator
+
+UI should allow:
+
+* Create project.
+* Upload MP4.
+* Upload SRT.
+* Create initial project.json.
+
+---
+
+## Feature 2 — AI Scene Import
+
+User uploads an AI-generated JSON containing scenes.
+
+Example:
+
+```json
+{
+  "clips": [
+    {
+      "start": "...",
+      "end": "...",
+      "title": "...",
+      "hook": "...",
+      "next_hook": "..."
+    }
+  ]
+}
+```
+
+Backend merges scenes into project.json.
+
+No video processing here.
+
+---
+
+## Feature 3 — Clip Cutter
+
+Reads project.json.
+
+For each clip:
+
+* Cut source video with FFmpeg.
+* Save clips/001.mp4.
+* Extract transcript lines from SRT between start/end.
+* Store transcript inside project.json.
+* Update clip_file.
+* Update status = "cut".
+
+No intro/outro or subtitles burned into video.
+
+This tool should be reusable for any project.
+
+---
+
+## Feature 4 — Stitch / Branding Tool
+
+Reads project.json.
+
+For every clip:
+
+* Add 2-second intro card.
+* Intro uses hook text.
+* Background is intro.png or solid black.
+* Add channel logo if available.
+* Burn subtitles only if clip does not already contain subtitles.
+* Use transcript stored in project.json.
+* Subtitle style:
+
+  * White text.
+  * Black outline.
+  * Bottom centered.
+  * TikTok/Shorts style.
+* Add outro card.
+* Outro displays next_hook text.
+* Save final/001.mp4.
+* Update final_file.
+* Update status = "completed".
+
+---
+
+## Frontend Pages
+
+### Dashboard
+
+Show all projects.
+
+### Project View
+
+Display:
+
+* Source video.
+* Subtitle uploaded.
+* Number of clips.
+* Progress bar.
+
+### Clips Table
+
+Columns:
+
+* Clip ID.
+* Start.
+* End.
+* Title.
+* Status.
+* Preview.
+* Transcript.
+* Clip file.
+* Final file.
+
+Each row has:
+
+* Preview clip.
+* Recut button.
+* Restitch button.
+* Edit hook.
+* Edit title.
+* Edit transcript.
+
+### Branding Settings
+
+Editable:
+
+* Channel name.
+* Intro duration.
+* Outro duration.
+* Outro text.
+* Upload intro background.
+* Upload outro background.
+* Upload logo.
+
+Saved into project.json.
+
+---
+
+## Backend APIs
+
+* POST /projects/create
+* POST /projects/import-scenes
+* GET /projects/{id}
+* POST /projects/{id}/cut
+* POST /projects/{id}/stitch
+* POST /projects/{id}/clip/{clipId}/recut
+* POST /projects/{id}/clip/{clipId}/restitch
+
+---
+
+## FFmpeg Requirements
+
+Implement reusable Python wrappers.
+
+Functions:
+
+* cut_clip()
+* create_intro()
+* burn_subtitles()
+* create_outro()
+* stitch_video()
+
+Keep each function independent.
+
+---
+
+## Subtitle Handling
+
+Use pysubs2.
+
+* Load SRT.
+* Extract only subtitle events inside clip timestamps.
+* Shift timestamps so subtitles start at 0 in the clip.
+* Generate temporary ASS subtitle file.
+* Burn ASS into video with FFmpeg.
+* If transcript already exists in project.json, regenerate subtitles from transcript timestamps.
+
+---
+
+## Setup Guide
+
+Generate:
+
+### backend/README.md
+
+Include:
+
+* Python installation.
+* Virtual environment.
+* pip install.
+* FFmpeg installation.
+* Run FastAPI server.
+
+### frontend/README.md
+
+Include:
+
+* npm install.
+* npm run dev.
+
+### root README.md
+
+Include complete workflow.
+
+Workflow:
+
+1. Create project.
+2. Upload video + SRT.
+3. Import AI scenes JSON.
+4. Cut clips.
+5. Review clips.
+6. Stitch branded Shorts.
+7. Export final videos.
+
+---
+
+## Requirements
+
+* Cross-platform (macOS/Linux first, Windows compatible).
+* Clean folder structure.
+* Typed Python where practical.
+* Tailwind dark UI.
+* Progress indicators during FFmpeg processing.
+* Do not use Docker.
+* Make the project easy to extend later with YouTube/TikTok publishing and AI scene detection.
