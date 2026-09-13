@@ -17,9 +17,7 @@ export function Clips() {
   const addToast = useProjectStore((s) => s.addToast);
   const clips: Clip[] = project?.clips || [];
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
-  const [selectedClipIds, setSelectedClipIds] = useState<string[]>([]);
   const [cutting, setCutting] = useState(false);
-  const [renderingSelected, setRenderingSelected] = useState(false);
   const [recutting, setRecutting] = useState(false);
   const selectedClip = clips.find((clip) => clip.id === selectedClipId) || null;
   const [editStart, setEditStart] = useState("");
@@ -57,27 +55,6 @@ export function Clips() {
     }
   };
 
-  const toggleSelectedClip = (clipId: string) => {
-    setSelectedClipIds((current) => current.includes(clipId) ? current.filter((id) => id !== clipId) : [...current, clipId]);
-  };
-
-  const renderSelectedClips = async () => {
-    if (!projectId || selectedClipIds.length === 0) return;
-    setRenderingSelected(true);
-    try {
-      const response = await fetch(`/projects/${encodeURIComponent(projectId)}/render-clips`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clip_ids: selectedClipIds }) });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.detail || "Could not render selected clips");
-      setProject(payload.project);
-      setSelectedClipIds([]);
-      addToast({ type: payload.errors?.length ? "warning" : "success", title: payload.errors?.length ? "Some clips failed" : "Clips rendered", message: `${payload.rendered?.length || 0} individual clip video(s) are ready to download.` });
-    } catch (error) {
-      addToast({ type: "error", title: "Individual render failed", message: error instanceof Error ? error.message : "Could not render selected clips" });
-    } finally {
-      setRenderingSelected(false);
-    }
-  };
-
   const handleRecut = async () => {
     if (!projectId || !selectedClip) return;
     setRecutting(true);
@@ -98,11 +75,6 @@ export function Clips() {
     } finally {
       setRecutting(false);
     }
-  };
-
-  const handleInclude = (clipId: string) => {
-    if (!project) return;
-    setProject({ ...project, clips: project.clips.map((clip) => clip.id === clipId ? { ...clip, include_in_stitch: clip.include_in_stitch === false } : clip) });
   };
 
   const handleDelete = (clipId: string) => {
@@ -145,13 +117,6 @@ export function Clips() {
         </div>
       )}
 
-      {selectedClipIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-violet-50 p-4">
-          <div><p className="text-sm font-bold text-violet-900">{selectedClipIds.length} clip{selectedClipIds.length === 1 ? "" : "s"} selected</p><p className="text-xs text-violet-700">Render these separately with their own hook and subscribe outro.</p></div>
-          <div className="flex gap-2"><Button variant="secondary" size="sm" onClick={() => setSelectedClipIds([])}>Clear</Button><Button size="sm" onClick={renderSelectedClips} disabled={renderingSelected}>{renderingSelected ? "Rendering…" : "Render selected clips"}</Button></div>
-        </div>
-      )}
-
       {/* Clip Grid */}
       {clips.length === 0 ? (
         <EmptyState
@@ -165,15 +130,14 @@ export function Clips() {
             <ClipCard
               key={clip.id}
               clip={clip}
-              isSelected={selectedClipIds.includes(clip.id)}
-              onSelect={() => toggleSelectedClip(clip.id)}
+              isSelected={selectedClipId === clip.id}
+              onSelect={() => setSelectedClipId(clip.id)}
               previewUrl={projectId ? `/projects/${encodeURIComponent(projectId)}/clips/${encodeURIComponent(clip.id)}/preview` : undefined}
               onEdit={() => setSelectedClipId(clip.id)}
               downloadUrl={projectId ? `/projects/${encodeURIComponent(projectId)}/clips/${encodeURIComponent(clip.id)}/download` : undefined}
               onPreview={() => {
                 if (clip.clip_file) window.open(`/projects/${encodeURIComponent(projectId || "")}/clips/${encodeURIComponent(clip.id)}/preview`, "_blank", "noopener,noreferrer");
               }}
-              onInclude={() => handleInclude(clip.id)}
               onDelete={() => handleDelete(clip.id)}
             />
           ))}

@@ -1,4 +1,4 @@
-import { Activity, ArrowUpRight, ChevronDown, Command, Settings, Sparkles } from "lucide-react";
+import { Activity, ArrowUpRight, ChevronDown, Command, Settings, Sparkles, WandSparkles } from "lucide-react";
 
 interface TopToolbarProps {
   projectName: string;
@@ -14,10 +14,15 @@ export function TopToolbar({ projectName, status, processing, progress, onExport
   const hasProject = projectName !== "CocktailClips";
 
   return (
-    <header className="relative z-30 flex h-[72px] shrink-0 items-center border-b border-slate-200/90 bg-white/90 px-4 backdrop-blur-xl sm:px-7">
+    <header className="relative z-30 flex h-[68px] shrink-0 items-center border-b border-black/5 bg-white/72 px-4 backdrop-blur-2xl sm:px-6">
       <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-500 text-lg font-black text-white shadow-lg shadow-violet-500/20">✦</div>
+          <div className="mr-1 hidden items-center gap-2 sm:flex" aria-hidden="true">
+            <span className="mac-traffic-light bg-[#ff5f57]" />
+            <span className="mac-traffic-light bg-[#febc2e]" />
+            <span className="mac-traffic-light bg-[#28c840]" />
+          </div>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white shadow-lg shadow-slate-900/15"><WandSparkles size={17} /></div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-[15px] font-black tracking-[-0.03em] text-slate-950">Cocktail<span className="text-violet-600">Clips</span></span>
@@ -45,7 +50,7 @@ export function TopToolbar({ projectName, status, processing, progress, onExport
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <div className="hidden items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-400 lg:flex"><Command size={11} /> K for help</div>
+          <div className="hidden items-center gap-1 rounded-lg border border-black/5 bg-black/[.025] px-2 py-1 text-[10px] font-semibold text-slate-400 lg:flex"><Command size={11} /> K</div>
           <button onClick={onSettings} className="rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Open settings"><Settings size={17} /></button>
           <button onClick={onExport} disabled={!canExport} className={`group flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${canExport ? "bg-slate-950 text-white shadow-lg shadow-slate-900/15 hover:bg-violet-700" : "cursor-not-allowed bg-slate-100 text-slate-400"}`}><Sparkles size={14} className={canExport ? "text-fuchsia-300" : ""} /> Export <ArrowUpRight size={14} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></button>
         </div>

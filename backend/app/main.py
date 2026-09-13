@@ -7,7 +7,7 @@ FastAPI-based backend that handles:
 - Stitch/branding (Phase 3)
 """
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 import uvicorn
@@ -20,10 +20,12 @@ import re
 import ffmpeg
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timezone
 
 from .cut_clip import cut_clip, parse_timestamp_to_seconds, validate_timestamp_format
 from .stitch_video import stitch_video, get_video_duration, validate_video_file
 from .pysubs2_integration import extract_subtitles_srt, shift_subtitle_timestamps, generate_ass_file, burn_subtitles_ffmpeg
+from .media_import import MediaImportError, download_media, fetch_metadata
 
 app = FastAPI(
     title="CocktailClips Backend",
@@ -43,6 +45,16 @@ app.add_middleware(
 # Base directory for all projects
 BASE_DIR = Path("projects")
 BASE_DIR.mkdir(parents=True, exist_ok=True)
+IMPORT_JOBS: dict[str, dict] = {}
+
+
+def _new_project_data(project_id: str, project_name: str, source: dict) -> dict:
+    return {
+        "project": {"id": project_id, "name": project_name},
+        "source": source,
+        "branding": {"intro_duration": 1.5, "hook_duration": 1.5, "outro_duration": 1.5, "opening_image": None, "closing_image": None},
+        "clips": [],
+    }
 
 
 @app.get("/")
@@ -113,23 +125,10 @@ async def create_project(
             f.write(content)
 
     # Create initial project.json
-    project_data = {
-        "project": {
-            "id": project_id,
-            "name": project_name
-        },
-        "source": {
-            "video": "source.mp4",
-            "subtitle": "source.srt" if subtitle else None
-        },
-        "branding": {
-            "channel": "CocktailClips",
-            "intro_duration": 2,
-            "outro_duration": 2,
-            "outro_text": "Follow for Part 2"
-        },
-        "clips": []
-    }
+    project_data = _new_project_data(project_id, project_name, {
+        "type": "local", "video": "source.mp4", "subtitle": "source.srt" if subtitle else None,
+        "original_filename": video.filename,
+    })
 
     project_json_path = project_dir / "project.json"
     with open(project_json_path, "w") as f:
@@ -284,7 +283,7 @@ async def list_projects():
                 "id": data.get("project", {}).get("id", project_dir.name),
                 "name": data.get("project", {}).get("name", project_dir.name),
                 "clips": len(clips),
-                "completed": sum(1 for clip in clips if clip.get("status") == "completed"),
+                "completed": sum(1 for clip in clips if clip.get("individual_render_status") == "completed" and str(clip.get("final_file") or "").startswith("final/clips/")),
                 "updated_at": project_json_path.stat().st_mtime,
             })
         except (OSError, json.JSONDecodeError):
@@ -578,31 +577,53 @@ def _run_ffmpeg(args: list[str]) -> None:
         raise RuntimeError(detail)
 
 
+def _branding_asset_path(project_dir: Path, branding: dict, key: str) -> Optional[Path]:
+    """Resolve a persisted branding asset while keeping it inside the project."""
+    relative_path = branding.get(key)
+    if not relative_path:
+        return None
+    candidate = (project_dir / str(relative_path)).resolve()
+    try:
+        candidate.relative_to(project_dir.resolve())
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None
+
+
+def _render_still_image(image_path: Path, output_path: Path, duration: float) -> None:
+    """Turn a branding still into a silent 1080x1920 video segment."""
+    image_filter = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
+    _run_ffmpeg([
+        "-loop", "1", "-i", str(image_path),
+        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+        "-t", str(duration), "-vf", image_filter, "-r", "30",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+        str(output_path),
+    ])
+
+
 def _render_individual_clip(project_dir: Path, clip: dict, branding: dict, output_path: Path) -> None:
-    """Render one hook + normalized clip + subscribe outro file."""
+    """Render one opening image + normalized clip + closing image file."""
     clip_id = re.sub(r"[^A-Za-z0-9_-]", "_", str(clip.get("id", "clip")))
     work_dir = project_dir / "rendered" / "individual" / clip_id
     work_dir.mkdir(parents=True, exist_ok=True)
     source_clip = project_dir / "clips" / clip["clip_file"]
     hook_duration = float(branding.get("hook_duration", 1.5))
-    outro_duration = float(branding.get("outro_duration", 2))
-    subscribe_text = branding.get("outro_text", "Follow for more")
+    outro_duration = float(branding.get("outro_duration", 1.5))
+    opening_image = _branding_asset_path(project_dir, branding, "opening_image")
+    closing_image = _branding_asset_path(project_dir, branding, "closing_image")
+    if not opening_image or not closing_image:
+        raise RuntimeError("Upload both opening and closing branding images before rendering")
 
-    first_frame = work_dir / "first-frame.png"
-    _run_ffmpeg(["-i", str(source_clip), "-vf", "select=eq(n\\,0)", "-frames:v", "1", str(first_frame)])
-    hook_path = work_dir / "hook.mp4"
-    hook_text = _drawtext_value(clip.get("hook") or clip.get("title") or "The moment everyone is talking about")
-    hook_filter = f"scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,drawtext={_drawtext_font_option()}text='{hook_text}':fontcolor=white:fontsize=64:borderw=4:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2"
-    _run_ffmpeg(["-loop", "1", "-i", str(first_frame), "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", str(hook_duration), "-vf", hook_filter, "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(hook_path)])
+    hook_path = work_dir / "opening.mp4"
+    _render_still_image(opening_image, hook_path, hook_duration)
 
     normalized_path = work_dir / "clip.mp4"
     normalize_filter = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
     _run_ffmpeg(["-i", str(source_clip), "-vf", normalize_filter, "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", str(normalized_path)])
 
-    outro_path = work_dir / "outro.mp4"
-    outro_text = _drawtext_value(subscribe_text)
-    outro_filter = f"drawtext={_drawtext_font_option()}text='{outro_text}':fontcolor=white:fontsize=64:borderw=4:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2"
-    _run_ffmpeg(["-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=30", "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", str(outro_duration), "-vf", outro_filter, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(outro_path)])
+    outro_path = work_dir / "closing.mp4"
+    _render_still_image(closing_image, outro_path, outro_duration)
 
     concat_list = work_dir / "segments.txt"
     entries = [hook_path, normalized_path, outro_path]
@@ -616,12 +637,12 @@ def _render_individual_clip(project_dir: Path, clip: dict, branding: dict, outpu
 @app.post("/projects/{project_id}/branding")
 async def update_branding(
     project_id: str,
-    channel: Optional[str] = Form(default=None),
     hook_duration: Optional[float] = Form(default=None),
     outro_duration: Optional[float] = Form(default=None),
-    outro_text: Optional[str] = Form(default=None),
+    opening_image: Optional[UploadFile] = File(default=None),
+    closing_image: Optional[UploadFile] = File(default=None),
 ):
-    """Update persisted branding values used by the reel renderer."""
+    """Save opening/closing artwork and durations used by the reel renderer."""
     project_dir = BASE_DIR / project_id
     project_json_path = project_dir / "project.json"
     if not project_dir.exists() or not project_json_path.exists():
@@ -630,8 +651,6 @@ async def update_branding(
     with open(project_json_path, "r") as f:
         project_data = json.load(f)
     branding = project_data.setdefault("branding", {})
-    if channel is not None:
-        branding["channel"] = channel.strip() or "CocktailClips"
     if hook_duration is not None:
         if not 0.5 <= hook_duration <= 10:
             raise HTTPException(status_code=400, detail="Hook duration must be between 0.5 and 10 seconds")
@@ -640,8 +659,22 @@ async def update_branding(
         if not 0.5 <= outro_duration <= 10:
             raise HTTPException(status_code=400, detail="Outro duration must be between 0.5 and 10 seconds")
         branding["outro_duration"] = outro_duration
-    if outro_text is not None:
-        branding["outro_text"] = outro_text.strip() or "Follow for more"
+
+    assets_dir = project_dir / "assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    allowed_extensions = {".png", ".jpg", ".jpeg", ".webp"}
+    for field_name, upload in (("opening_image", opening_image), ("closing_image", closing_image)):
+        if upload is None:
+            continue
+        extension = Path(upload.filename or "").suffix.lower()
+        if extension not in allowed_extensions:
+            raise HTTPException(status_code=400, detail="Branding images must be PNG, JPG, JPEG, or WebP")
+        destination = assets_dir / f"{'opening' if field_name == 'opening_image' else 'closing'}{extension}"
+        destination.write_bytes(await upload.read())
+        if destination.stat().st_size == 0:
+            destination.unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail="Uploaded branding image is empty")
+        branding[field_name] = destination.relative_to(project_dir).as_posix()
 
     project_data["output"] = {"file": None, "status": "not_started"}
     with open(project_json_path, "w") as f:
@@ -649,9 +682,26 @@ async def update_branding(
     return JSONResponse(content={"status": "success", "project": project_data})
 
 
+@app.get("/projects/{project_id}/branding/{slot}")
+async def get_branding_image(project_id: str, slot: str):
+    """Return the persisted opening or closing artwork for UI previews."""
+    if slot not in {"opening", "closing"}:
+        raise HTTPException(status_code=404, detail="Branding image not found")
+    project_dir = BASE_DIR / project_id
+    project_json_path = project_dir / "project.json"
+    if not project_json_path.exists():
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    with open(project_json_path, "r") as f:
+        project_data = json.load(f)
+    image_path = _branding_asset_path(project_dir, project_data.get("branding", {}), f"{slot}_image")
+    if not image_path:
+        raise HTTPException(status_code=404, detail="Branding image not found")
+    return FileResponse(path=image_path)
+
+
 @app.post("/projects/{project_id}/render-reel")
 async def render_reel(project_id: str):
-    """Render one vertical hook + clips + subscribe reel from cut clips."""
+    """Render one vertical opening image + clips + closing image reel."""
     project_dir = BASE_DIR / project_id
     project_json_path = project_dir / "project.json"
     if not project_dir.exists() or not project_json_path.exists():
@@ -669,22 +719,19 @@ async def render_reel(project_id: str):
 
     branding = project_data.get("branding", {})
     hook_duration = float(branding.get("hook_duration", 1.5))
-    outro_duration = float(branding.get("outro_duration", 2))
-    subscribe_text = branding.get("outro_text", "Follow for more")
+    outro_duration = float(branding.get("outro_duration", 1.5))
+    opening_image = _branding_asset_path(project_dir, branding, "opening_image")
+    closing_image = _branding_asset_path(project_dir, branding, "closing_image")
+    if not opening_image or not closing_image:
+        raise HTTPException(status_code=400, detail="Upload both opening and closing branding images before rendering")
     render_dir = project_dir / "rendered"
     final_dir = project_dir / "final"
     render_dir.mkdir(parents=True, exist_ok=True)
     final_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        first_clip_path = project_dir / "clips" / clips[0]["clip_file"]
-        first_frame = render_dir / "hook-frame.png"
-        _run_ffmpeg(["-i", str(first_clip_path), "-vf", "select=eq(n\\,0)", "-frames:v", "1", str(first_frame)])
-
-        hook_path = render_dir / "hook.mp4"
-        hook_text = _drawtext_value(clips[0].get("hook") or clips[0].get("title") or "The moment everyone is talking about")
-        hook_filter = f"scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,drawtext={_drawtext_font_option()}text='{hook_text}':fontcolor=white:fontsize=64:borderw=4:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2"
-        _run_ffmpeg(["-loop", "1", "-i", str(first_frame), "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", str(hook_duration), "-vf", hook_filter, "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(hook_path)])
+        hook_path = render_dir / "opening.mp4"
+        _render_still_image(opening_image, hook_path, hook_duration)
 
         segment_paths = [hook_path]
         for index, clip in enumerate(clips, start=1):
@@ -694,10 +741,8 @@ async def render_reel(project_id: str):
             _run_ffmpeg(["-i", str(input_path), "-vf", normalize_filter, "-r", "30", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", str(segment_path)])
             segment_paths.append(segment_path)
 
-        outro_path = render_dir / "outro.mp4"
-        outro_text = _drawtext_value(subscribe_text)
-        outro_filter = f"drawtext={_drawtext_font_option()}text='{outro_text}':fontcolor=white:fontsize=64:borderw=4:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2"
-        _run_ffmpeg(["-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=30", "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000", "-t", str(outro_duration), "-vf", outro_filter, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(outro_path)])
+        outro_path = render_dir / "closing.mp4"
+        _render_still_image(closing_image, outro_path, outro_duration)
         segment_paths.append(outro_path)
 
         concat_list = render_dir / "segments.txt"
@@ -741,7 +786,7 @@ async def render_selected_clips(project_id: str, clip_ids: list[str] = Body(...,
     missing_ids = [clip_id for clip_id in clip_ids if clip_id not in clips_by_id]
     if missing_ids:
         raise HTTPException(status_code=404, detail=f"Clips not found: {', '.join(missing_ids)}")
-    uncut = [clip.get("id", "unknown") for clip in selected if clip.get("status") != "cut" or not clip.get("clip_file") or not (project_dir / "clips" / clip["clip_file"]).exists()]
+    uncut = [clip.get("id", "unknown") for clip in selected if clip.get("status") not in {"cut", "completed"} or not clip.get("clip_file") or not (project_dir / "clips" / clip["clip_file"]).exists()]
     if uncut:
         raise HTTPException(status_code=400, detail=f"Cut these clips before rendering: {', '.join(uncut)}")
 
@@ -756,6 +801,7 @@ async def render_selected_clips(project_id: str, clip_ids: list[str] = Body(...,
             _render_individual_clip(project_dir, clip, branding, output_path)
             clip["final_file"] = f"final/clips/{output_name}"
             clip["individual_render_status"] = "completed"
+            clip.pop("render_error", None)
             rendered.append({"id": clip["id"], "file": clip["final_file"], "size_bytes": output_path.stat().st_size})
         except Exception as error:
             clip["individual_render_status"] = "failed"
@@ -782,6 +828,29 @@ async def download_rendered_clip(project_id: str, clip_id: str):
     if not output_path.exists():
         raise HTTPException(status_code=404, detail="Individual rendered clip file not found")
     return FileResponse(str(output_path), media_type="video/mp4", filename=output_path.name)
+
+
+@app.get("/projects/{project_id}/clips/{clip_id}/rendered-preview")
+async def preview_rendered_clip(project_id: str, clip_id: str):
+    """Stream a branded clip inline without triggering a browser download."""
+    project_dir = BASE_DIR / project_id
+    project_json_path = project_dir / "project.json"
+    if not project_json_path.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    with open(project_json_path, "r") as f:
+        project_data = json.load(f)
+    clip = next((item for item in project_data.get("clips", []) if str(item.get("id")) == clip_id), None)
+    final_file = str(clip.get("final_file") or "") if clip else ""
+    if not final_file.startswith("final/clips/"):
+        raise HTTPException(status_code=404, detail="Individual rendered clip not found")
+    output_path = (project_dir / final_file).resolve()
+    try:
+        output_path.relative_to(project_dir.resolve())
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Invalid rendered clip path") from error
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Individual rendered clip file not found")
+    return FileResponse(str(output_path), media_type="video/mp4", headers={"Content-Disposition": f'inline; filename="{output_path.name}"', "Cache-Control": "no-store"})
 
 
 @app.post("/projects/{project_id}/stitch")
@@ -1326,3 +1395,59 @@ if __name__ == "__main__":
         port=8000,
 
     )
+
+
+@app.post("/imports/metadata")
+async def import_metadata(payload: dict = Body(...)):
+    """Inspect a supported URL without downloading its media."""
+    try:
+        return fetch_metadata(str(payload.get("url") or ""))
+    except Exception as error:
+        detail = str(error) if isinstance(error, MediaImportError) else f"Could not inspect this source: {error}"
+        raise HTTPException(status_code=400, detail=detail) from error
+
+
+def _run_url_import(job_id: str, project_id: str, project_name: str, url: str, quality: str, subtitles: bool) -> None:
+    project_dir = BASE_DIR / project_id
+    try:
+        def update(values: dict) -> None:
+            IMPORT_JOBS[job_id].update(values)
+        metadata = download_media(url, project_dir, quality, subtitles, update)
+        project_data = _new_project_data(project_id, project_name, {
+            "type": "url", "video": "source.mp4", "subtitle": metadata.pop("subtitle"), **metadata,
+        })
+        (project_dir / "project.json").write_text(json.dumps(project_data, indent=2), encoding="utf-8")
+        IMPORT_JOBS[job_id].update({"stage": "ready", "progress": 100, "status": "completed", "project_id": project_id})
+    except Exception as error:
+        IMPORT_JOBS[job_id].update({"stage": "failed", "status": "failed", "error": str(error)})
+
+
+@app.post("/imports/start", status_code=202)
+async def start_url_import(background_tasks: BackgroundTasks, payload: dict = Body(...)):
+    """Start a background URL import and return a polling job ID."""
+    url = str(payload.get("url") or "")
+    project_name = str(payload.get("project_name") or "Imported media").strip()[:120]
+    quality = str(payload.get("quality") or "1080p")
+    project_id, job_id = str(uuid.uuid4()), str(uuid.uuid4())
+    IMPORT_JOBS[job_id] = {
+        "id": job_id, "status": "processing", "stage": "preparing", "progress": 0,
+        "project_id": project_id, "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    background_tasks.add_task(_run_url_import, job_id, project_id, project_name, url, quality, bool(payload.get("import_subtitles", True)))
+    return IMPORT_JOBS[job_id]
+
+
+@app.get("/imports/{job_id}")
+async def get_import_job(job_id: str):
+    job = IMPORT_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Import job not found")
+    return job
+
+
+@app.get("/projects/{project_id}/transcript/download")
+async def download_project_transcript(project_id: str):
+    transcript_path = BASE_DIR / project_id / "source.srt"
+    if not transcript_path.exists():
+        raise HTTPException(status_code=404, detail="This project does not have an imported transcript")
+    return FileResponse(transcript_path, media_type="application/x-subrip", filename="source.srt")

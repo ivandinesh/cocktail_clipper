@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
-import { ArrowDown, Braces, CheckCircle2, Clapperboard, Download, FileJson, Film, Layers3, Scissors } from "lucide-react";
+import { ArrowDown, Braces, CheckCircle2, Clapperboard, Download, FileJson, Film, Scissors } from "lucide-react";
 import { ProjectHome } from "./ProjectHome";
 import { Scenes } from "./Scenes";
 import { Clips } from "./Clips";
-import { Stitch } from "./Stitch";
 import { Export } from "./Export";
 import { MasterJSON } from "./MasterJSON";
 import { AIPlanImporter } from "../components/workflow/AIPlanImporter";
@@ -13,7 +12,6 @@ const steps = [
   { id: "plan", label: "AI plan", icon: FileJson },
   { id: "scenes", label: "Scenes", icon: Film },
   { id: "clips", label: "Clips", icon: Scissors },
-  { id: "stitch", label: "Stitch", icon: Layers3 },
   { id: "export", label: "Export", icon: Download },
   { id: "json", label: "Project data", icon: Braces },
 ];
@@ -51,7 +49,7 @@ function WorkflowSection({
 
 export function WorkflowPage() {
   return (
-    <div className="min-h-full overflow-y-auto">
+    <div className="h-full min-h-0 overflow-y-auto overscroll-contain scroll-smooth">
       <div className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 px-5 py-3 backdrop-blur-xl sm:px-8">
         <div className="mx-auto flex max-w-[1500px] items-center gap-2 overflow-x-auto">
           {steps.map(({ id, label, icon: Icon }, index) => (
@@ -81,13 +79,10 @@ export function WorkflowPage() {
         <WorkflowSection id="clips" number="04" title="Shape your clips" description="Select, review, cut, and prepare the moments you want to keep.">
           <Clips />
         </WorkflowSection>
-        <WorkflowSection id="stitch" number="05" title="Build the sequence" description="Arrange your selected clips into one polished short-form sequence.">
-          <Stitch />
-        </WorkflowSection>
-        <WorkflowSection id="export" number="06" title="Export the final cut" description="Choose the output settings and render your finished video locally.">
+        <WorkflowSection id="export" number="05" title="Export branded clips" description="Apply your shared brand cards and render every clip as a separate local file.">
           <Export />
         </WorkflowSection>
-        <WorkflowSection id="json" number="07" title="Project data" description="Use the visual editor or inspect the master project JSON when you need precise control.">
+        <WorkflowSection id="json" number="06" title="Project data" description="Use the visual editor or inspect the master project JSON when you need precise control.">
           <MasterJSON />
         </WorkflowSection>
       </div>

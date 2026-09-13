@@ -1,17 +1,16 @@
-import { ArrowRight, Brain, CheckCircle2, Film, HardDrive, Keyboard, LockKeyhole, Scissors, Sparkles, Upload, WandSparkles } from "lucide-react";
+import { ArrowRight, Brain, CheckCircle2, HardDrive, Keyboard, LockKeyhole, Scissors, Sparkles, Upload, WandSparkles } from "lucide-react";
 import { CreateProject } from "./CreateProject";
 
 const workflow = [
   { number: "01", title: "Add your source", text: "Drop in an MP4 and optional SRT transcript. Your files stay on this machine.", icon: Upload, color: "bg-violet-100 text-violet-700" },
   { number: "02", title: "Find the moments", text: "Analyze your transcript and scan AI-detected scenes with timestamps, summaries, and scores.", icon: Brain, color: "bg-fuchsia-100 text-fuchsia-700" },
   { number: "03", title: "Cut the clips", text: "Select the moments worth keeping, trim them, and prepare a focused clip library.", icon: Scissors, color: "bg-amber-100 text-amber-700" },
-  { number: "04", title: "Build the sequence", text: "Arrange clips on the stitch timeline, then add hooks, branding, and captions.", icon: Film, color: "bg-sky-100 text-sky-700" },
-  { number: "05", title: "Export locally", text: "Render a finished short-form video with progress feedback and a local download.", icon: WandSparkles, color: "bg-emerald-100 text-emerald-700" },
+  { number: "04", title: "Export separately", text: "Add shared opening and closing cards, then render each clip to its own local MP4.", icon: WandSparkles, color: "bg-emerald-100 text-emerald-700" },
 ];
 
 export function LandingPage() {
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto">
+    <main className="h-full min-h-0 overflow-y-auto overscroll-contain scroll-smooth">
       <section className="mx-auto grid max-w-[1400px] items-center gap-10 px-5 py-12 sm:px-8 lg:grid-cols-[1.05fr_.95fr] lg:py-20">
         <div className="max-w-2xl">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700">
@@ -21,7 +20,7 @@ export function LandingPage() {
             Make the good parts <span className="text-gradient">impossible to miss.</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-8 text-slate-600">
-            CocktailClips turns long videos and transcripts into polished short-form clips. Find the signal, cut with confidence, stitch a sequence, and export without sending your media to the cloud.
+            CocktailClips turns long videos and transcripts into polished short-form clips. Find the signal, cut with confidence, brand each clip, and export without sending your media to the cloud.
           </p>
           <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
             {[
@@ -50,7 +49,7 @@ export function LandingPage() {
             <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">A clear path from raw footage to ready-to-post.</h2>
             <p className="mt-3 text-slate-500">Every tool is available in one continuous workflow after you create a project.</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {workflow.map(({ number, title, text, icon: Icon, color }) => (
               <article key={number} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
                 <div className={`mb-5 flex h-11 w-11 items-center justify-center rounded-2xl ${color}`}><Icon size={20} /></div>
@@ -77,7 +76,7 @@ export function LandingPage() {
           <div className="mb-5 flex items-center gap-3"><LockKeyhole className="text-violet-600" /><h2 className="text-xl font-bold text-slate-900">Built for private editing</h2></div>
           <div className="space-y-4 text-sm leading-6 text-slate-600">
             <p><strong className="text-slate-900">No cloud uploads.</strong> Your video, transcript, project JSON, and generated clips remain in your local project directory.</p>
-            <p><strong className="text-slate-900">One source of truth.</strong> The master project JSON keeps scenes, clips, branding, stitch order, and export state together.</p>
+            <p><strong className="text-slate-900">One source of truth.</strong> The master project JSON keeps scenes, clips, brand cards, and individual export status together.</p>
             <p><strong className="text-slate-900">Designed for iteration.</strong> Recut clips, reorder the timeline, adjust hooks, and export again without losing your work.</p>
           </div>
         </div>

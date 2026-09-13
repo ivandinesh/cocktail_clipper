@@ -5,14 +5,25 @@ export interface Project {
   };
   source: {
     video: string;
-    subtitle: string;
+    subtitle: string | null;
+    type?: "local" | "url";
+    provider?: string;
+    url?: string;
+    title?: string;
+    creator?: string;
+    duration?: number;
+    thumbnail?: string;
+    subtitle_language?: string | null;
+    subtitle_kind?: "manual" | "automatic" | null;
   };
   branding: {
-    channel: string;
+    channel?: string;
     intro_duration: number;
     outro_duration: number;
     hook_duration?: number;
-    outro_text: string;
+    outro_text?: string;
+    opening_image?: string | null;
+    closing_image?: string | null;
   };
   clips: Clip[];
   scenes?: Scene[];
@@ -36,7 +47,8 @@ export interface Clip {
   final_file: string | null;
   status: "planned" | "processing" | "cut" | "completed" | "failed";
   scene_index?: number;
-  include_in_stitch?: boolean;
+  individual_render_status?: "not_started" | "rendering" | "completed" | "failed" | "outdated";
+  render_error?: string;
 }
 
 export interface Scene {

@@ -23,6 +23,8 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
+The requirements include `yt-dlp` for YouTube metadata, media, and caption imports. FFmpeg must be on `PATH` so separate video and audio streams can be merged into `source.mp4`.
+
 ### Verify FFmpeg
 
 ```powershell

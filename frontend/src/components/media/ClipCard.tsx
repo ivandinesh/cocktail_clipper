@@ -1,19 +1,18 @@
 import type { Clip } from "../../types";
-import { Download, Play, Check, Clock, Pencil, Trash2 } from "lucide-react";
+import { Clapperboard, Download, Play, Pencil, Trash2 } from "lucide-react";
 
 interface ClipCardProps {
   clip: Clip;
   isSelected: boolean;
   onSelect: () => void;
   onPreview: () => void;
-  onInclude: () => void;
   onDelete?: () => void;
   previewUrl?: string;
   onEdit?: () => void;
   downloadUrl?: string;
 }
 
-export function ClipCard({ clip, isSelected, onSelect, onPreview, onInclude, onDelete, previewUrl, onEdit, downloadUrl }: ClipCardProps) {
+export function ClipCard({ clip, isSelected, onSelect, onPreview, onDelete, previewUrl, onEdit, downloadUrl }: ClipCardProps) {
   const formatTime = (time: string) => {
     const [h, m, s] = time.split(":").map(Number);
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
@@ -40,11 +39,9 @@ export function ClipCard({ clip, isSelected, onSelect, onPreview, onInclude, onD
     >
       {/* Thumbnail */}
       <div className="aspect-video bg-zinc-900 relative overflow-hidden">
-        {previewUrl && clip.clip_file ? (
-          <video src={previewUrl} preload="metadata" muted className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-zinc-500">Preview after cutting</div>
-        )}
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-950 text-zinc-500">
+          {previewUrl && clip.clip_file ? <Clapperboard size={26} /> : <span className="text-xs">Preview after cutting</span>}
+        </div>
         <button onClick={(event) => { event.stopPropagation(); onPreview(); }} className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/25" aria-label={`Preview ${clip.title}`}>
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white shadow-lg"><Play size={20} className="ml-0.5" /></span>
         </button>
@@ -95,9 +92,6 @@ export function ClipCard({ clip, isSelected, onSelect, onPreview, onInclude, onD
           }`}>
             {clip.status}
           </span>
-          {clip.include_in_stitch !== false && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-full">in stitch</span>
-          )}
         </div>
       </div>
     </div>

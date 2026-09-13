@@ -8,6 +8,7 @@ uvicorn[standard]>=0.27.0
 # Video & Subtitle Processing
 ffmpeg-python>=0.2.0
 pysubs2>=1.0.0
+yt-dlp>=2025.1.15
 
 # HTTP & Forms
 python-multipart>=0.0.6

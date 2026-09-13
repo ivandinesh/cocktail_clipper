@@ -39,7 +39,7 @@ export function MasterJSON() {
       </div>
 
       <div className="card p-6">
-        <JSONEditor project={project || { project: { id: "", name: "" }, source: { video: "", subtitle: "" }, branding: { channel: "", intro_duration: 0, outro_duration: 0, outro_text: "" }, clips: [] }} onSave={handleSave} />
+        <JSONEditor project={project || { project: { id: "", name: "" }, source: { video: "", subtitle: "" }, branding: { intro_duration: 0, outro_duration: 0, opening_image: null, closing_image: null }, clips: [] }} onSave={handleSave} />
       </div>
     </div>
   );

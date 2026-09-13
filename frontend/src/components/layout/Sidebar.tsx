@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { LayoutDashboard, FolderOpen, Film, Scissors, Layers, Download, Settings, ChevronDown } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Film, Scissors, Download, Settings, ChevronDown } from "lucide-react";
 
 interface SidebarProps {
   activeSection: string;
@@ -17,7 +17,6 @@ const sections = [
   { id: "sources", label: "Sources", icon: FolderOpen },
   { id: "scenes", label: "Scenes", icon: Film },
   { id: "clips", label: "Clips", icon: Scissors },
-  { id: "stitch", label: "Stitch", icon: Layers },
   { id: "exports", label: "Exports", icon: Download },
 ];
 
@@ -34,7 +33,6 @@ export function Sidebar({ activeSection, onSectionChange, projectName, stats }: 
       sources: `/${query}`,
       scenes: `/scenes${query}`,
       clips: `/clips${query}`,
-      stitch: `/stitch${query}`,
       exports: `/export${query}`,
     };
     navigate(routes[section] || `/${query}`);

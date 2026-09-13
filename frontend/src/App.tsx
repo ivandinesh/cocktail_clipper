@@ -38,7 +38,7 @@ export default function App() {
     addToast({ type: "info", title: "Settings", message: "Settings panel coming soon" });
   }, [addToast]);
 
-  const canExport = Boolean(project && project.clips.some((c: Clip) => c.status === "completed"));
+  const canExport = Boolean(project && project.clips.some((c: Clip) => c.status === "cut" || c.status === "completed"));
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -47,7 +47,7 @@ export default function App() {
   ], !!projectId);
 
   return (
-    <div className="h-screen flex flex-col bg-modern text-slate-900 overflow-hidden relative">
+    <div className="flex h-dvh flex-col overflow-hidden bg-modern text-slate-900 relative">
       <TopToolbar
         projectName={project?.project.name || "CocktailClips"}
         status={processing.active ? processing.operation : "Ready"}
@@ -60,7 +60,7 @@ export default function App() {
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <WorkflowRail projectActive={Boolean(projectId)} />
-        <div className="min-w-0 flex-1 overflow-hidden">{projectId ? <ProjectLayout /> : <LandingPage />}</div>
+        <div className="h-full min-w-0 flex-1 overflow-hidden">{projectId ? <ProjectLayout /> : <LandingPage />}</div>
         <WorkspaceRail />
       </div>
       <ToastContainer

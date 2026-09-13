@@ -84,8 +84,8 @@ export function JSONEditor({ project, onSave }: JSONEditorProps) {
             </div>
           </div>
           <div className="p-3 bg-zinc-50 rounded-xl">
-            <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Channel</label>
-            <p className="text-sm text-zinc-900 mt-1">{project.branding.channel}</p>
+            <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Brand cards</label>
+            <p className="text-sm text-zinc-900 mt-1">{project.branding.opening_image && project.branding.closing_image ? "Opening and closing images ready" : "Images not configured"}</p>
           </div>
           <div className="p-3 bg-zinc-50 rounded-xl">
             <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Clips</label>

@@ -6,6 +6,7 @@ import { VideoPreview } from "../components/media/VideoPreview";
 import { Button } from "../components/ui";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ProgressBar } from "../components/ui";
+import { Download } from "lucide-react";
 
 export function ProjectHome() {
   const [searchParams] = useSearchParams();
@@ -27,7 +28,7 @@ export function ProjectHome() {
       .then((data: Project) => {
         setProject(data);
         setProjectId(projectId);
-        const completed = data.clips?.filter((c) => c.status === "completed").length || 0;
+        const completed = data.clips?.filter((c) => c.individual_render_status === "completed" && c.final_file?.startsWith("final/clips/")).length || 0;
         const total = data.clips?.length || 0;
         if (total === 0) setStatus("Ready");
         else if (completed === 0) setStatus("Analyze transcript…");
@@ -52,8 +53,8 @@ export function ProjectHome() {
     );
   }
 
-  const completed = project.clips?.filter((c) => c.status === "completed").length || 0;
-  const cut = project.clips?.filter((c) => c.status === "cut").length || 0;
+  const completed = project.clips?.filter((c) => c.individual_render_status === "completed" && c.final_file?.startsWith("final/clips/")).length || 0;
+  const cut = project.clips?.filter((c) => (c.status === "cut" || c.status === "completed") && c.clip_file).length || 0;
   const total = project.clips?.length || 0;
   const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -62,7 +63,6 @@ export function ProjectHome() {
     { label: "Analyze", icon: "🧠", done: !!project.scenes && project.scenes.length > 0 },
     { label: "Select", icon: "📋", done: total > 0 },
     { label: "Cut", icon: "✂️", done: cut > 0 },
-    { label: "Stitch", icon: "🧵", done: false },
     { label: "Export", icon: "📤", done: completed === total && total > 0 },
   ];
 
@@ -104,13 +104,16 @@ export function ProjectHome() {
 
           {/* Project Info */}
           <div className="card p-6">
-            <h2 className="text-lg font-semibold text-zinc-900 mb-4">Project Details</h2>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-zinc-900">Project Details</h2>
+              {project.source.subtitle && <a href={`${apiBaseUrl}/projects/${projectId}/transcript/download`} download><Button size="sm" variant="secondary"><Download size={14} className="mr-1.5" />Download transcript</Button></a>}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               {[
                 ["Filename", project.source.video],
-              ["Duration", "—"],
+              ["Duration", project.source.duration ? `${Math.floor(project.source.duration / 60)}m ${Math.round(project.source.duration % 60)}s` : "—"],
               ["Resolution", "—"],
-              ["Transcript", project.source.subtitle ? "✓ Loaded" : "—"],
+              ["Transcript", project.source.subtitle ? `Loaded${project.source.subtitle_kind ? ` · ${project.source.subtitle_kind}` : ""}` : "—"],
               ["Scenes", project.scenes?.length || 0],
               ["Clips", total],
               ["Last Processed", "—"],
@@ -166,23 +169,23 @@ export function ProjectHome() {
           <div className="card p-6 bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200">
             <h3 className="text-sm font-semibold text-blue-900 mb-2">Next Step</h3>
             <p className="text-sm text-blue-700 mb-4">
-              {total === 0 ? "Add scenes or clips to get started" :
-               cut === 0 ? "Analyze your video to detect scenes" :
-               completed < total ? "Review and cut your clips" :
-               "Ready to stitch and export!"}
+              {total === 0 ? "Import your AI-generated clip plan" :
+               cut < total ? "Cut the imported clips from the source" :
+               completed < total ? "Apply branding and export each clip" :
+               "All clips are exported"}
             </p>
             <Button
               size="sm"
               className="w-full"
               onClick={() => {
-                const target = total === 0 || cut === 0 ? "scenes" : completed < total ? "clips" : "stitch";
+                const target = total === 0 ? "plan" : cut < total ? "clips" : "export";
                 document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
             >
-              {total === 0 ? "Add Scenes" :
-               cut === 0 ? "Analyze Video" :
-               completed < total ? "Review Clips" :
-               "Go to Stitch"}
+              {total === 0 ? "Import AI Plan" :
+               cut < total ? "Cut Clips" :
+               completed < total ? "Export Clips" :
+               "View Exports"}
             </Button>
           </div>
         </div>
