@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Check, Clapperboard, Download, Eye, ImagePlus, Loader2, Play, Sparkles, Upload, X } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Check, Clapperboard, Download, Eye, ImagePlus, Loader2, Play, Sparkles, Upload, X, Youtube } from "lucide-react";
 import { useProjectStore } from "../stores/projectStore";
 import type { Clip } from "../types";
 import { Button } from "../components/ui";
@@ -44,6 +44,7 @@ function clipDuration(clip: Clip) {
 export function Export() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("projectId");
+  const navigate = useNavigate();
   const project = useProjectStore((state) => state.project);
   const setProject = useProjectStore((state) => state.setProject);
   const addToast = useProjectStore((state) => state.addToast);
@@ -122,7 +123,7 @@ export function Export() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600">Delivery</p><h1 className="mt-1 text-3xl font-black tracking-[-0.035em] text-slate-950">Export branded clips</h1><p className="mt-1 text-sm text-slate-500">Every clip is saved separately with the same opening and closing cards.</p></div>
-        <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm ring-1 ring-black/5"><span className="text-emerald-600">{renderedCount}</span> of {clips.length} exported</div>
+        <div className="flex items-center gap-2"><div className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm ring-1 ring-black/5"><span className="text-emerald-600">{renderedCount}</span> of {clips.length} exported</div><Button variant="secondary" onClick={() => navigate(`/publish?projectId=${encodeURIComponent(projectId || "")}`)} disabled={renderedCount === 0}><Youtube size={16} className="mr-2 text-red-600"/>Publish</Button></div>
       </div>
 
       <div className="mac-window overflow-hidden rounded-[24px]">

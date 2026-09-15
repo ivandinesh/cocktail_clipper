@@ -9,7 +9,7 @@ FastAPI-based backend that handles:
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 import uvicorn
 import json
 import os
@@ -17,6 +17,7 @@ import uuid
 import tempfile
 import subprocess
 import re
+import html
 import ffmpeg
 from pathlib import Path
 from typing import Optional
@@ -26,6 +27,11 @@ from .cut_clip import cut_clip, parse_timestamp_to_seconds, validate_timestamp_f
 from .stitch_video import stitch_video, get_video_duration, validate_video_file
 from .pysubs2_integration import extract_subtitles_srt, shift_subtitle_timestamps, generate_ass_file, burn_subtitles_ffmpeg
 from .media_import import MediaImportError, download_media, fetch_metadata
+from .youtube_publish import (
+    PUBLISH_JOBS, YouTubePublishError, begin_oauth, connection_status,
+    disconnect as disconnect_youtube, finish_oauth, get_job as get_publish_job,
+    new_job as new_publish_job, save_client_secret, upload_video as upload_to_youtube,
+)
 
 app = FastAPI(
     title="CocktailClips Backend",
@@ -1451,3 +1457,89 @@ async def download_project_transcript(project_id: str):
     if not transcript_path.exists():
         raise HTTPException(status_code=404, detail="This project does not have an imported transcript")
     return FileResponse(transcript_path, media_type="application/x-subrip", filename="source.srt")
+
+
+@app.get("/publishing/youtube/status")
+async def youtube_connection_status():
+    return connection_status()
+
+
+@app.post("/publishing/youtube/client-secret")
+async def configure_youtube_client(client_secret: UploadFile = File(...)):
+    if not client_secret.filename or not client_secret.filename.lower().endswith(".json"):
+        raise HTTPException(status_code=400, detail="Choose a Google OAuth JSON file")
+    try:
+        save_client_secret(await client_secret.read())
+        return {"status": "success", **connection_status()}
+    except YouTubePublishError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/publishing/youtube/connect")
+async def connect_youtube():
+    try:
+        return {"authorization_url": begin_oauth()}
+    except YouTubePublishError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/publishing/youtube/callback")
+async def youtube_oauth_callback(code: str = "", state: str = "", error: str = ""):
+    if error:
+        return HTMLResponse("<h2>YouTube connection was cancelled.</h2><p>You can close this window.</p>", status_code=400)
+    try:
+        finish_oauth(code, state)
+        return HTMLResponse("<script>window.opener?.postMessage('youtube-connected', '*'); setTimeout(() => window.close(), 800);</script><h2>YouTube connected.</h2><p>This window will close automatically.</p>")
+    except Exception as reason:
+        return HTMLResponse(f"<h2>Could not connect YouTube.</h2><p>{html.escape(str(reason))}</p>", status_code=400)
+
+
+@app.delete("/publishing/youtube/connection")
+async def disconnect_youtube_account():
+    disconnect_youtube()
+    return {"status": "success"}
+
+
+def _run_youtube_publish(job_id: str, project_id: str, clip_id: str, metadata: dict) -> None:
+    job = PUBLISH_JOBS[job_id]
+    project_dir = BASE_DIR / project_id
+    project_path = project_dir / "project.json"
+    try:
+        project_data = json.loads(project_path.read_text(encoding="utf-8"))
+        clip = next((item for item in project_data.get("clips", []) if str(item.get("id")) == clip_id), None)
+        final_file = str(clip.get("final_file") or "") if clip else ""
+        if not final_file.startswith("final/clips/"):
+            raise YouTubePublishError("Render this clip before publishing")
+        video_path = (project_dir / final_file).resolve()
+        video_path.relative_to(project_dir.resolve())
+        job.update({"status": "uploading", "progress": 0})
+        result = upload_to_youtube(video_path, metadata, job.update)
+        job.update({"status": "completed", "progress": 100, **result})
+        clip.setdefault("publishing", {})["youtube"] = {"status": "published", **result}
+        project_path.write_text(json.dumps(project_data, indent=2), encoding="utf-8")
+    except Exception as reason:
+        job.update({"status": "failed", "error": str(reason)})
+
+
+@app.post("/projects/{project_id}/clips/{clip_id}/publish/youtube", status_code=202)
+async def publish_clip_to_youtube(project_id: str, clip_id: str, background_tasks: BackgroundTasks, metadata: dict = Body(...)):
+    project_path = BASE_DIR / project_id / "project.json"
+    if not project_path.is_file():
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not connection_status().get("connected"):
+        raise HTTPException(status_code=400, detail="Connect a YouTube account before publishing")
+    project_data = json.loads(project_path.read_text(encoding="utf-8"))
+    clip = next((item for item in project_data.get("clips", []) if str(item.get("id")) == clip_id), None)
+    if not clip or not str(clip.get("final_file") or "").startswith("final/clips/"):
+        raise HTTPException(status_code=400, detail="Render this clip before publishing")
+    job = new_publish_job(project_id, clip_id)
+    background_tasks.add_task(_run_youtube_publish, job["id"], project_id, clip_id, metadata)
+    return job
+
+
+@app.get("/publishing/jobs/{job_id}")
+async def publishing_job(job_id: str):
+    job = get_publish_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Publishing job not found")
+    return job

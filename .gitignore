@@ -26,10 +26,26 @@ dist/
 .env
 .env.local
 .env.*.local
+*.env
+
+# Credentials and sensitive local state
+.secrets/
+secrets/
+credentials/
+client_secret*.json
+client_secrets*.json
+google_client_secret*.json
+youtube_token*.json
+token.json
+*.pem
+*.key
+*.p12
+*.pfx
 
 # IDE
 .vscode/
 .idea/
+*.code-workspace
 *.swp
 *.swo
 

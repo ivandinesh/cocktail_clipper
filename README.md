@@ -72,6 +72,16 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173). Keep both terminals running.
 
+### Start both services
+
+After installing backend and frontend dependencies, start both development servers from one PowerShell window:
+
+```powershell
+.\start-dev.ps1
+```
+
+The launcher writes combined output/error logs to `logs/backend.log` and `logs/frontend.log`. Press `Ctrl+C` in the launcher window to stop both services.
+
 ## YouTube import
 
 The URL importer currently supports YouTube only. Paste a public YouTube video URL on the Import Media screen, wait for metadata, select a quality, and choose whether to import captions.
@@ -79,6 +89,12 @@ The URL importer currently supports YouTube only. Paste a public YouTube video U
 Supported quality presets are Best, 1080p, 720p, and 480p. yt-dlp selects compatible streams and FFmpeg merges separate video and audio into the project's `source.mp4`.
 
 Private, age-restricted, members-only, region-restricted, or authentication-protected videos may not import. Only download media you have permission to use.
+
+## YouTube publishing
+
+After rendering at least one clip, choose **Publish** from Export. The separate publishing page lets you configure Google OAuth, connect a YouTube account, edit metadata, and upload an individual rendered clip with progress tracking. Uploads default to Private.
+
+Create a Desktop OAuth client in Google Cloud, enable YouTube Data API v3, and upload the downloaded client JSON on the publishing page. OAuth configuration and tokens are stored under the local `.secrets/` directory and are excluded from Git. Never commit or share client-secret or token files.
 
 ## Project files
 

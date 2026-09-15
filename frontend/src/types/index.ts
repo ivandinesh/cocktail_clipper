@@ -37,6 +37,14 @@ export interface Project {
 
 export interface Clip {
   id: string;
+  publishing?: {
+    youtube?: {
+      status: "published" | "failed" | "uploading";
+      video_id?: string;
+      video_url?: string;
+      uploaded_at?: string;
+    };
+  };
   start: string;
   end: string;
   title: string;
